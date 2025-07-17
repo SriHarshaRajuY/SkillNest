@@ -1,4 +1,5 @@
 import { createContext, useState , useEffect} from "react";
+import { jobsData } from "../assets/assets";
 
 export const AppContext = createContext();
 
