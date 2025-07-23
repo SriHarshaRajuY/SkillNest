@@ -1,6 +1,7 @@
 import React, {useState} from 'react'
 import Navbar from '../components/Navbar'
-import { assets } from '../assets/assets';
+import { assets, jobsApplied } from '../assets/assets';
+import moment from 'moment'
 
 const Applications = () => {
 
@@ -33,17 +34,35 @@ const Applications = () => {
             </div>
           }
         </div>
-        <h2>Jobs Applied</h2>
-        <table>
+        <h2 className='text-xl font-semibold mb-4'>Jobs Applied</h2>
+        <table className='min-w-full bg-white border rounded-lg'>
           <thead>
             <tr>
-              <th>Company</th>
-              <th>Job title</th>
-              <th>Location</th>
-              <th>Date</th>
-              <th>Status</th>
+              <th className='py-3 px-4 border-b text-left'>Company</th>
+              <th className='py-3 px-4 border-b text-left'>Job title</th>
+              <th className='py-3 px-4 border-b text-left max-sm:hidden'>Location</th>
+              <th className='py-3 px-4 border-b text-left max-sm:hidden'>Date</th>
+              <th className='py-3 px-4 border-b text-left'>Status</th>
             </tr>
           </thead>
+          <tbody>
+            {jobsApplied.map((job, index) => true ? (
+              <tr>
+                <td>
+                  <img src={job.logo} alt="" />
+                  {job.company}
+                </td>
+                <td className='py-2 px-4 border-b'>{job.title}</td>
+                <td className='py-2 px-4 border-b max-sm:hidden'>{job.location}</td>
+                <td className='py-2 px-4 border-b max-sm:hidden'>{moment(job.date).format('ll')}</td>
+                <td className='py-2 px-4 border-b'>
+                  <span className={`${job.status === 'Accepted' ? 'bg-green-100' : job.status === 'Rejected'}`}>
+                    {job.status}
+                  </span>
+                  </td>
+              </tr>
+            ) : (null) )}
+          </tbody>
         </table>
       </div>
     </div>
