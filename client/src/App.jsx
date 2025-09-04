@@ -3,10 +3,12 @@ import React from 'react'
   import ApplyJob from './pages/Applyjob'
   import Home from './pages/Home'
   import Applications from './pages/Applications'
+import RecruiterLogin from './components/RecruiterLogin'
 
   const App = () => {
     return (
       <div>
+        <RecruiterLogin/>
         <Routes>
           <Route path='/' element={<Home/>}/>
           <Route path='/apply-job/:id' element={<ApplyJob/>}/>
