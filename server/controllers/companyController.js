@@ -48,6 +48,10 @@ export const registerCompany = async (req, res) => {
         })
 
     } catch (error) {
+        // Handle MongoDB duplicate key error (E11000) gracefully
+        if (error.code === 11000) {
+            return res.json({ success: false, message: 'An account with this email already exists. Please login instead.' })
+        }
         res.json({ success: false, message: error.message })
     }
 }
@@ -57,11 +61,21 @@ export const loginCompany = async (req, res) => {
 
     const { email, password } = req.body
 
+    if (!email || !password) {
+        return res.json({ success: false, message: 'Email and password are required' })
+    }
+
     try {
 
         const company = await Company.findOne({ email })
 
-        if (await bcrypt.compare(password, company.password)) {
+        if (!company) {
+            return res.json({ success: false, message: 'Invalid email or password' })
+        }
+
+        const isMatch = await bcrypt.compare(password, company.password)
+
+        if (isMatch) {
 
             res.json({
                 success: true,
@@ -109,13 +123,17 @@ export const postJob = async (req, res) => {
 
     const companyId = req.company._id
 
+    if (!title || !description || !location || !salary || !level || !category) {
+        return res.json({ success: false, message: 'Please fill in all required fields' })
+    }
+
     try {
 
         const newJob = new Job({
             title,
             description,
             location,
-            salary,
+            salary: Number(salary),
             companyId,
             date: Date.now(),
             level,
@@ -124,7 +142,7 @@ export const postJob = async (req, res) => {
 
         await newJob.save()
 
-        res.json({ success: true, newJob })
+        res.json({ success: true, message: 'Job posted successfully!', newJob })
 
     } catch (error) {
 
@@ -182,10 +200,22 @@ export const ChangeJobApplicationsStatus = async (req, res) => {
 
         const { id, status } = req.body
 
-        // Find Job application and update status
-        await JobApplication.findOneAndUpdate({ _id: id }, { status })
+        if (!id || !status) {
+            return res.json({ success: false, message: 'Application ID and status are required' })
+        }
 
-        res.json({ success: true, message: 'Status Changed' })
+        const validStatuses = ['Pending', 'Accepted', 'Rejected']
+        if (!validStatuses.includes(status)) {
+            return res.json({ success: false, message: 'Invalid status value' })
+        }
+
+        const application = await JobApplication.findByIdAndUpdate(id, { status }, { new: true })
+
+        if (!application) {
+            return res.json({ success: false, message: 'Application not found' })
+        }
+
+        res.json({ success: true, message: 'Status updated successfully' })
 
     } catch (error) {
 
@@ -194,20 +224,29 @@ export const ChangeJobApplicationsStatus = async (req, res) => {
     }
 }
 
-// Change Job Visiblity
+// Change Job Visibility
 export const changeVisiblity = async (req, res) => {
     try {
 
         const { id } = req.body
 
+        if (!id) {
+            return res.json({ success: false, message: 'Job ID is required' })
+        }
+
         const companyId = req.company._id
 
         const job = await Job.findById(id)
 
-        if (companyId.toString() === job.companyId.toString()) {
-            job.visible = !job.visible
+        if (!job) {
+            return res.json({ success: false, message: 'Job not found' })
         }
 
+        if (companyId.toString() !== job.companyId.toString()) {
+            return res.json({ success: false, message: 'Not authorized to modify this job' })
+        }
+
+        job.visible = !job.visible
         await job.save()
 
         res.json({ success: true, job })

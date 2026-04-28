@@ -123,17 +123,23 @@ const JobListing = () => {
                 <h3 className='font-medium text-3xl py-2' id='job-list'>Latest jobs</h3>
                 <p className='mb-8'>Get your desired job from top companies</p>
                 <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'>
-                    {filteredJobs.slice((currentPage - 1) * 6, currentPage * 6).map((job, index) => (
-                        <JobCard key={index} job={job} />
-                    ))}
+                    {filteredJobs.length > 0
+                        ? filteredJobs.slice((currentPage - 1) * 6, currentPage * 6).map((job, index) => (
+                            <JobCard key={index} job={job} />
+                        ))
+                        : <div className='col-span-3 text-center py-16 text-gray-500'>
+                            <p className='text-xl'>No jobs found matching your search.</p>
+                            <p className='text-sm mt-2'>Try adjusting your filters or search terms.</p>
+                          </div>
+                    }
                 </div>
 
 
                 {/* Pagination */}
-                {filteredJobs.length > 0 && (
+                {filteredJobs.length > 6 && (
                     <div className='flex items-center justify-center space-x-2 mt-10'>
                         <a href="#job-list">
-                            <img onClick={() => setCurrentPage(Math.max(currentPage - 1), 1)} src={assets.left_arrow_icon} alt="" />
+                            <img onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} src={assets.left_arrow_icon} alt="" />
                         </a>
                         {Array.from({ length: Math.ceil(filteredJobs.length / 6) }).map((_, index) => (
                             <a key={index} href="#job-list">

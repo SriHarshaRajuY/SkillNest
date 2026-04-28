@@ -10,20 +10,21 @@ import JobCard from '../components/JobCard'
 import Footer from '../components/Footer'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useUser } from '@clerk/clerk-react'
 
 const ApplyJob = () => {
 
   const { id } = useParams()
 
   const { getToken } = useAuth()
+  const { user } = useUser()
 
   const navigate = useNavigate()
 
   const [JobData, setJobData] = useState(null)
   const [isAlreadyApplied, setIsAlreadyApplied] = useState(false)
 
-  const { jobs, backendUrl, userData, userApplications, fetchUserApplications } = useContext(AppContext)
+  const { jobs, backendUrl, userData, userDataLoaded, userApplications, fetchUserApplications } = useContext(AppContext)
 
   const fetchJob = async () => {
 
@@ -46,13 +47,24 @@ const ApplyJob = () => {
   const applyHandler = async () => {
     try {
 
+      // Not logged in at all (Clerk)
+      if (!user) {
+        return toast.error('Please login to apply for jobs')
+      }
+
+      // Still fetching profile from server
+      if (!userDataLoaded) {
+        return toast.error('Loading your profile, please wait...')
+      }
+
+      // Profile loaded but null (server error - very rare)
       if (!userData) {
-        return toast.error('Login to apply for jobs')
+        return toast.error('Could not load your profile. Please refresh the page.')
       }
 
       if (!userData.resume) {
         navigate('/applications')
-        return toast.error('Upload resume to apply')
+        return toast.error('Please upload your resume before applying')
       }
 
       const token = await getToken()
@@ -76,7 +88,7 @@ const ApplyJob = () => {
 
   const checkAlreadyApplied = () => {
 
-    const hasApplied = userApplications.some(item => item.jobId._id === JobData._id)
+    const hasApplied = userApplications.some(item => item.jobId && item.jobId._id === JobData._id)
     setIsAlreadyApplied(hasApplied)
 
   }

@@ -11,7 +11,8 @@ const AddJob = () => {
     const [location, setLocation] = useState('Bangalore');
     const [category, setCategory] = useState('Programming');
     const [level, setLevel] = useState('Beginner level');
-    const [salary, setSalary] = useState(0);
+    const [salary, setSalary] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const editorRef = useRef(null)
     const quillRef = useRef(null)
@@ -21,96 +22,139 @@ const AddJob = () => {
     const onSubmitHandler = async (e) => {
         e.preventDefault()
 
-        try {
+        const description = quillRef.current.root.innerHTML.trim()
 
-            const description = quillRef.current.root.innerHTML
+        // Validation
+        if (!title.trim()) {
+            return toast.error('Please enter a job title')
+        }
+        if (description === '' || description === '<p><br></p>') {
+            return toast.error('Please enter a job description')
+        }
+        if (!salary || Number(salary) <= 0) {
+            return toast.error('Please enter a valid salary')
+        }
+
+        try {
+            setIsSubmitting(true)
 
             const { data } = await axios.post(backendUrl + '/api/company/post-job',
-                { title, description, location, salary, category, level },
+                { title: title.trim(), description, location, salary: Number(salary), category, level },
                 { headers: { token: companyToken } }
             )
 
             if (data.success) {
-                toast.success(data.message)
+                toast.success('Job posted successfully!')
                 setTitle('')
-                setSalary(0)
-                quillRef.current.root.innerHTML = ""
+                setSalary('')
+                quillRef.current.root.innerHTML = ''
             } else {
                 toast.error(data.message)
             }
 
         } catch (error) {
             toast.error(error.message)
+        } finally {
+            setIsSubmitting(false)
         }
-
-
     }
 
-
     useEffect(() => {
-        // Initiate Qill only once
         if (!quillRef.current && editorRef.current) {
             quillRef.current = new Quill(editorRef.current, {
                 theme: 'snow',
+                placeholder: 'Describe the role, responsibilities, and requirements...',
             })
         }
     }, [])
 
     return (
-        <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-3'>
+        <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-4 max-w-3xl'>
+            <h2 className='text-xl font-semibold text-gray-800'>Post a New Job</h2>
 
+            {/* Job Title */}
             <div className='w-full'>
-                <p className='mb-2'>Job Title</p>
-                <input type="text" placeholder='Type here'
-                    onChange={e => setTitle(e.target.value)} value={title}
-                    required
-                    className='w-full max-w-lg px-3 py-2 border-2 border-gray-300 rounded'
+                <label className='block mb-1 text-sm font-medium text-gray-700'>Job Title <span className='text-red-500'>*</span></label>
+                <input
+                    type='text'
+                    placeholder='e.g. Senior React Developer'
+                    onChange={e => setTitle(e.target.value)}
+                    value={title}
+                    className='w-full max-w-lg px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors'
                 />
             </div>
 
+            {/* Job Description */}
             <div className='w-full max-w-lg'>
-                <p className='my-2'>Job Description</p>
-                <div ref={editorRef}>
-
-                </div>
+                <label className='block mb-1 text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
+                <div ref={editorRef} className='min-h-[150px]' />
             </div>
 
-            <div className='flex flex-col sm:flex-row gap-2 w-full sm:gap-8'>
-
-                <div>
-                    <p className='mb-2'>Job Category</p>
-                    <select className='w-full px-3 py-2 border-2 border-gray-300 rounded' onChange={e => setCategory(e.target.value)}>
-                        {JobCategories.map((category, index) => (
-                            <option key={index} value={category}>{category}</option>
+            {/* Category / Location / Level */}
+            <div className='flex flex-col sm:flex-row gap-4 w-full'>
+                <div className='flex-1'>
+                    <label className='block mb-1 text-sm font-medium text-gray-700'>Category</label>
+                    <select
+                        className='w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors'
+                        onChange={e => setCategory(e.target.value)}
+                        value={category}
+                    >
+                        {JobCategories.map((cat, i) => (
+                            <option key={i} value={cat}>{cat}</option>
                         ))}
                     </select>
                 </div>
 
-                <div>
-                    <p className='mb-2'>Job Location</p>
-                    <select className='w-full px-3 py-2 border-2 border-gray-300 rounded' onChange={e => setLocation(e.target.value)}>
-                        {JobLocations.map((location, index) => (
-                            <option key={index} value={location}>{location}</option>
+                <div className='flex-1'>
+                    <label className='block mb-1 text-sm font-medium text-gray-700'>Location</label>
+                    <select
+                        className='w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors'
+                        onChange={e => setLocation(e.target.value)}
+                        value={location}
+                    >
+                        {JobLocations.map((loc, i) => (
+                            <option key={i} value={loc}>{loc}</option>
                         ))}
                     </select>
                 </div>
 
-                <div>
-                    <p className='mb-2'>Job Level</p>
-                    <select className='w-full px-3 py-2 border-2 border-gray-300 rounded' onChange={e => setLevel(e.target.value)}>
-                        <option value="Beginner level">Beginner level</option>
-                        <option value="Intermediate level">Intermediate level</option>
-                        <option value="Senior level">Senior level</option>
+                <div className='flex-1'>
+                    <label className='block mb-1 text-sm font-medium text-gray-700'>Experience Level</label>
+                    <select
+                        className='w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors'
+                        onChange={e => setLevel(e.target.value)}
+                        value={level}
+                    >
+                        <option value='Beginner level'>Beginner</option>
+                        <option value='Intermediate level'>Intermediate</option>
+                        <option value='Senior level'>Senior</option>
                     </select>
                 </div>
-
             </div>
+
+            {/* Salary */}
             <div>
-                <p className='mb-2'>Job Salary</p>
-                <input min={0} className='w-full px-3 py-2 border-2 border-gray-300 rounded sm:w-[120px]' onChange={e => setSalary(e.target.value)} type="Number" placeholder='2500' />
+                <label className='block mb-1 text-sm font-medium text-gray-700'>Salary (₹/month) <span className='text-red-500'>*</span></label>
+                <input
+                    min={1}
+                    className='w-full px-3 py-2 border-2 border-gray-300 rounded-lg sm:w-[160px] focus:outline-none focus:border-blue-500 transition-colors'
+                    onChange={e => setSalary(e.target.value)}
+                    value={salary}
+                    type='number'
+                    placeholder='e.g. 50000'
+                />
             </div>
 
-            <button className='w-28 py-3 mt-4 bg-black text-white rounded'>ADD</button>
+            {/* Submit */}
+            <button
+                type='submit'
+                disabled={isSubmitting}
+                className={`px-8 py-3 mt-2 rounded-lg text-white font-medium transition-colors ${isSubmitting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'}`}
+            >
+                {isSubmitting ? 'Posting...' : 'Post Job'}
+            </button>
         </form>
     )
 }

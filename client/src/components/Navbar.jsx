@@ -1,8 +1,8 @@
 import { useContext } from 'react'
-import { assets } from '../assets/assets'
 import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
+import SkillNestLogo from './SkillNestLogo'
 
 const Navbar = () => {
 
@@ -14,23 +14,43 @@ const Navbar = () => {
     const { setShowRecruiterLogin } = useContext(AppContext)
 
     return (
-        <div className='shadow py-4'>
-            <div className='container px-4 2xl:px-20 mx-auto flex justify-between items-center'>
-                <img onClick={() => navigate('/')} className='cursor-pointer' src={assets.logo} alt="" />
-                {
-                    user
-                        ? <div className='flex items-center gap-3'>
-                            <Link to={'/applications'}>Applied Jobs</Link>
-                            <p>|</p>
-                            <p className='max-sm:hidden'>Hi, {user.firstName + " " + user.lastName}</p>
-                            <UserButton />
-                        </div>
-                        : <div className='flex gap-4 max-sm:text-xs'>
-                            <button onClick={e => setShowRecruiterLogin(true)} className='text-gray-600'>Recruiter Login</button>
-                            <button onClick={e => openSignIn()} className='bg-blue-600 text-white px-6 sm:px-9 py-2 rounded-full'>Login</button>
-                        </div>
-                }
+        <div className='shadow-sm border-b bg-white sticky top-0 z-50'>
+            <div className='container px-4 2xl:px-20 mx-auto flex justify-between items-center h-16'>
+                {/* Logo */}
+                <div onClick={() => navigate('/')} className='cursor-pointer'>
+                    <SkillNestLogo />
+                </div>
 
+                {/* Right Side Nav */}
+                {user
+                    ? <div className='flex items-center gap-3 text-sm'>
+                        <Link
+                            to='/applications'
+                            className='text-gray-600 hover:text-blue-600 transition-colors font-medium'
+                        >
+                            Applied Jobs
+                        </Link>
+                        <span className='text-gray-300'>|</span>
+                        <span className='text-gray-600 max-sm:hidden'>
+                            Hi, {user.firstName}
+                        </span>
+                        <UserButton afterSignOutUrl='/' />
+                    </div>
+                    : <div className='flex items-center gap-4 text-sm'>
+                        <button
+                            onClick={() => setShowRecruiterLogin(true)}
+                            className='text-gray-600 hover:text-blue-600 transition-colors font-medium'
+                        >
+                            Recruiter Login
+                        </button>
+                        <button
+                            onClick={() => openSignIn()}
+                            className='bg-blue-600 hover:bg-blue-700 transition-colors text-white px-5 py-2 rounded-full font-medium'
+                        >
+                            Login
+                        </button>
+                    </div>
+                }
             </div>
         </div>
     )
