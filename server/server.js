@@ -1,58 +1,89 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import { rateLimit } from 'express-rate-limit'
 import 'dotenv/config'
+import { clerkMiddleware } from '@clerk/express'
 import connectDB from './config/db.js'
+import connectCloudinary from './config/cloudinary.js'
 import { clerkWebhooks } from './controllers/webhooks.js'
 import companyRoutes from './routes/companyRoutes.js'
-import connectCloudinary from './config/cloudinary.js'
 import jobRoutes from './routes/jobRoutes.js'
 import userRoutes from './routes/userRoutes.js'
-import { clerkMiddleware } from '@clerk/express'
 
 const app = express()
+const PORT = process.env.PORT || 5000
 
-// Middlewares
-app.use(cors())
-app.use(express.json())
+// ─── Security headers ────────────────────────────────────────────────────────
+app.disable('x-powered-by')
+app.use(helmet({ contentSecurityPolicy: false }))
+
+// ─── CORS ────────────────────────────────────────────────────────────────────
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
+    .split(',').map(o => o.trim())
+
+app.use(cors({ origin: allowedOrigins, credentials: true }))
+
+// ─── Rate limiting (auth routes) ─────────────────────────────────────────────
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { success: false, message: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+})
+
+// ─── Clerk Webhooks — MUST come before express.json() ────────────────────────
+// Svix needs the raw request body buffer to verify the HMAC signature.
+// If express.json() runs first, req.body becomes a parsed object and verification fails.
+app.post('/webhooks', express.raw({ type: 'application/json' }), clerkWebhooks)
+
+// ─── Body parsing & Clerk middleware ─────────────────────────────────────────
+app.use(express.json({ limit: '1mb' }))
 app.use(clerkMiddleware())
 
-// Routes
-app.get('/', (req, res) => res.send('SkillNest API is running ✅'))
-app.post('/webhooks', clerkWebhooks)
-app.use('/api/company', companyRoutes)
+// ─── Routes ──────────────────────────────────────────────────────────────────
+app.get('/api/health', (req, res) => res.json({ success: true, message: 'SkillNest API is running ✅' }))
+app.use('/api/company', authLimiter, companyRoutes)
 app.use('/api/jobs', jobRoutes)
 app.use('/api/users', userRoutes)
 
-// 404 handler
+// ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
     res.status(404).json({ success: false, message: 'Route not found' })
 })
 
-// Global error handler
+// ─── Global error handler ────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-    console.error(err.stack)
+    if (err?.name === 'MulterError') {
+        return res.status(400).json({ success: false, message: err.message })
+    }
+    console.error('[Server Error]', err)
     res.status(500).json({ success: false, message: 'Internal server error' })
 })
 
-const PORT = process.env.PORT || 5000
-
+// ─── Startup ─────────────────────────────────────────────────────────────────
 const startServer = async () => {
-    await connectDB()
-    await connectCloudinary()
+    try {
+        await connectDB()
+        connectCloudinary()
 
-    const server = app.listen(PORT, () => {
-        console.log(`✅ SkillNest server running on port ${PORT}`)
-    })
+        const server = app.listen(PORT, () => {
+            console.log(`✅ SkillNest server running on port ${PORT}`)
+        })
 
-    server.on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-            console.error(`\n❌ Port ${PORT} is already in use!`)
-            console.error(`💡 Run: Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { taskkill /PID $_.OwningProcess /F }\n`)
-            process.exit(1)
-        } else {
-            throw err
-        }
-    })
+        server.on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.error(`\n❌ Port ${PORT} is already in use. Run: npm run dev (it auto-kills the port)\n`)
+                process.exit(1)
+            } else {
+                throw err
+            }
+        })
+    } catch (error) {
+        console.error('❌ Failed to start server:', error.message)
+        process.exit(1)
+    }
 }
 
 startServer()

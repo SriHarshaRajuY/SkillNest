@@ -1,13 +1,20 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose'
 
-const JobApplicationSchema = new mongoose.Schema({
+const jobApplicationSchema = new mongoose.Schema({
     userId: { type: String, ref: 'User', required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true },
-    status: { type: String, default: 'Pending' },
-    date: { type: Number, required: true }
-})
+    status: {
+        type: String,
+        enum: ['Pending', 'Accepted', 'Rejected'],
+        default: 'Pending',
+    },
+    date: { type: Number, required: true },
+}, { timestamps: true })
 
-const JobApplication = mongoose.model('JobApplication', JobApplicationSchema)
+// Prevent duplicate applications at the DB level
+jobApplicationSchema.index({ userId: 1, jobId: 1 }, { unique: true })
+
+const JobApplication = mongoose.models.JobApplication || mongoose.model('JobApplication', jobApplicationSchema)
 
 export default JobApplication
