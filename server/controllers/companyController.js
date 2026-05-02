@@ -5,6 +5,8 @@ import generateToken from '../utils/generateToken.js'
 import Job from '../models/Job.js'
 import JobApplication from '../models/JobApplication.js'
 import { removeLocalFile } from '../utils/fileHelpers.js'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import pdfParse from 'pdf-parse'
 
 // ─── Register a new company ───────────────────────────────────────────────────
 export const registerCompany = async (req, res) => {
@@ -14,6 +16,11 @@ export const registerCompany = async (req, res) => {
     if (!name || !email || !password || !imageFile) {
         removeLocalFile(imageFile?.path)
         return res.status(400).json({ success: false, message: 'Name, email, password, and company logo are required' })
+    }
+
+    if (password.length < 8) {
+        removeLocalFile(imageFile?.path)
+        return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long' })
     }
 
     try {
@@ -211,5 +218,76 @@ export const changeVisibility = async (req, res) => {
     } catch (error) {
         console.error('[changeVisibility]', error.message)
         res.status(500).json({ success: false, message: 'Failed to update job visibility' })
+    }
+}
+
+// ─── AI Resume Matcher ────────────────────────────────────────────────────────
+export const matchResume = async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        const companyId = req.company._id;
+
+        const application = await JobApplication.findById(applicationId)
+            .populate('userId', 'resume')
+            .populate('jobId', 'description companyId');
+
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        if (application.jobId.companyId.toString() !== companyId.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        if (!application.userId.resume) {
+            return res.status(400).json({ success: false, message: 'No resume uploaded by user' });
+        }
+
+        // Fetch resume PDF from Cloudinary
+        const response = await fetch(application.userId.resume);
+        if (!response.ok) throw new Error('Failed to fetch resume');
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const pdfData = await pdfParse(buffer);
+        const resumeText = pdfData.text;
+
+        const jobDescription = application.jobId.description;
+
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(500).json({ success: false, message: 'GEMINI_API_KEY is not configured.' });
+        }
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const prompt = `
+You are an expert ATS (Applicant Tracking System). 
+Compare the following Job Description to the candidate's Resume Text.
+Provide a match score out of 100, and a concise 2-sentence reason.
+Return ONLY valid JSON in the exact format:
+{
+  "score": 85,
+  "reason": "The candidate has strong React skills but lacks the required 5 years of Python experience."
+}
+
+Job Description:
+${jobDescription}
+
+Resume Text:
+${resumeText}
+`;
+
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+        
+        let cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanText);
+
+        res.json({ success: true, score: parsed.score, reason: parsed.reason });
+
+    } catch (error) {
+        console.error('[matchResume]', error.message);
+        res.status(500).json({ success: false, message: 'Failed to match resume. Please try again later.' });
     }
 }
