@@ -32,6 +32,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemon": "^3.1.7",
     "pdf-parse": "^1.1.1",
+    "socket.io": "^4.8.3",
     "svix": "^1.42.0"
   },
   "devDependencies": {

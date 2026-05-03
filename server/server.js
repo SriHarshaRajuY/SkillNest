@@ -1,11 +1,13 @@
+import http from 'http'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import { rateLimit } from 'express-rate-limit'
 import 'dotenv/config'
 import { clerkMiddleware } from '@clerk/express'
-import connectDB from './config/db.js'
+import connectDB, { migrateLegacyApplications } from './config/db.js'
 import connectCloudinary from './config/cloudinary.js'
+import { initRealtime } from './realtime/socketHub.js'
 import { clerkWebhooks } from './controllers/webhooks.js'
 import companyRoutes from './routes/companyRoutes.js'
 import jobRoutes from './routes/jobRoutes.js'
@@ -60,9 +62,13 @@ app.use(errorHandler)
 const startServer = async () => {
     try {
         await connectDB()
+        await migrateLegacyApplications()
         connectCloudinary()
 
-        const server = app.listen(PORT, () => {
+        const server = http.createServer(app)
+        initRealtime(server)
+
+        server.listen(PORT, () => {
             console.log(`✅ SkillNest server running on port ${PORT}`)
         })
 

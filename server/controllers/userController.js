@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken'
 import Job from '../models/Job.js'
 import JobApplication from '../models/JobApplication.js'
 import User from '../models/User.js'
@@ -73,6 +74,25 @@ export const getSignedResumeUrl = (resumeUrl) => {
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
+// GET /api/users/realtime-token — short-lived JWT for Socket.io (candidate)
+export const getRealtimeToken = async (req, res) => {
+    try {
+        const userId = getUserId(req)
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' })
+        }
+        const token = jwt.sign(
+            { userId, role: 'candidate' },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' },
+        )
+        res.json({ success: true, token })
+    } catch (error) {
+        console.error('[getRealtimeToken]', error.message)
+        res.status(500).json({ success: false, message: 'Failed to issue realtime token' })
+    }
+}
+
 // GET /api/users/user
 export const getUserData = async (req, res) => {
     try {
@@ -128,6 +148,7 @@ export const getUserJobApplications = async (req, res) => {
     try {
         const userId = getUserId(req)
         const applications = await JobApplication.find({ userId })
+            .select('-internalNotes')
             .populate('companyId', 'name email image')
             .populate('jobId', 'title description location category level salary')
             .sort({ date: -1 })

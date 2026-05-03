@@ -13,6 +13,9 @@ const AddJob = () => {
     const [level, setLevel] = useState('Beginner level');
     const [salary, setSalary] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isAuditing, setIsAuditing] = useState(false);
+    const [auditScore, setAuditScore] = useState(null);
+    const [auditSuggestions, setAuditSuggestions] = useState([]);
 
     const editorRef = useRef(null)
     const quillRef = useRef(null)
@@ -48,6 +51,8 @@ const AddJob = () => {
                 setTitle('')
                 setSalary('')
                 quillRef.current.root.innerHTML = ''
+                setAuditScore(null)
+                setAuditSuggestions([])
             } else {
                 toast.error(data.message)
             }
@@ -56,6 +61,33 @@ const AddJob = () => {
             toast.error(error.message)
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const runDiversityAudit = async () => {
+        const description = quillRef.current.root.innerHTML.trim();
+        if (!description || description === '<p><br></p>') {
+            return toast.error('Please enter a job description to audit');
+        }
+
+        try {
+            setIsAuditing(true);
+            const { data } = await axios.post(backendUrl + '/api/company/audit-job', 
+                { description },
+                { headers: { token: companyToken } }
+            );
+
+            if (data.success) {
+                setAuditScore(data.audit.score);
+                setAuditSuggestions(data.audit.suggestions);
+                toast.success('Diversity audit complete!');
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setIsAuditing(false);
         }
     }
 
@@ -86,8 +118,36 @@ const AddJob = () => {
 
             {/* Job Description */}
             <div className='w-full max-w-lg'>
-                <label className='block mb-1 text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
+                <div className='flex justify-between items-end mb-1'>
+                    <label className='block text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
+                    <button 
+                        type='button' 
+                        onClick={runDiversityAudit}
+                        disabled={isAuditing}
+                        className='text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-1 rounded-full font-medium transition-colors disabled:opacity-50'
+                    >
+                        {isAuditing ? 'Auditing...' : '✨ Run AI Diversity Audit'}
+                    </button>
+                </div>
                 <div ref={editorRef} className='min-h-[150px]' />
+
+                {auditScore !== null && (
+                    <div className='mt-3 p-4 bg-purple-50 rounded-lg border border-purple-100'>
+                        <div className='flex items-center gap-2 mb-2'>
+                            <span className='font-semibold text-purple-800'>Diversity Score:</span>
+                            <span className={`font-bold px-2 py-0.5 rounded ${auditScore >= 80 ? 'bg-green-100 text-green-700' : auditScore >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                {auditScore}/100
+                            </span>
+                        </div>
+                        {auditSuggestions.length > 0 ? (
+                            <ul className='list-disc pl-5 space-y-1 text-sm text-purple-900'>
+                                {auditSuggestions.map((s, i) => <li key={i}>{s}</li>)}
+                            </ul>
+                        ) : (
+                            <p className='text-sm text-green-700 font-medium'>Great job! This description looks very inclusive.</p>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Category / Location / Level */}

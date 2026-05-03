@@ -10,6 +10,8 @@ import AddJob from './pages/AddJob'
 import ManageJobs from './pages/ManageJobs'
 import ViewApplications from './pages/ViewApplications'
 import NotFound from './pages/NotFound'
+import CandidateMessages from './pages/CandidateMessages'
+import RecruiterMessages from './pages/RecruiterMessages'
 import ProtectedRecruiterRoute from './components/ProtectedRecruiterRoute'
 import 'quill/dist/quill.snow.css'
 import { ToastContainer } from 'react-toastify'
@@ -26,6 +28,8 @@ const App = () => {
                 <Route path='/' element={<Home />} />
                 <Route path='/apply-job/:id' element={<ApplyJob />} />
                 <Route path='/applications' element={<Applications />} />
+                <Route path='/messages' element={<CandidateMessages />} />
+                <Route path='/messages/:applicationId' element={<CandidateMessages />} />
                 <Route
                     path='/dashboard'
                     element={
@@ -37,6 +41,8 @@ const App = () => {
                     <Route path='add-job' element={<AddJob />} />
                     <Route path='manage-jobs' element={<ManageJobs />} />
                     <Route path='view-applications' element={<ViewApplications />} />
+                    <Route path='messages' element={<RecruiterMessages />} />
+                    <Route path='messages/:applicationId' element={<RecruiterMessages />} />
                 </Route>
                 <Route path='*' element={<NotFound />} />
             </Routes>

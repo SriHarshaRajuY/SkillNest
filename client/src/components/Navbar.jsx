@@ -1,14 +1,17 @@
 import { useContext, useState, useRef, useEffect } from 'react'
-import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
+import { useClerk, UserButton, useUser, useAuth } from '@clerk/clerk-react'
 import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { AppContext } from '../context/AppContext'
 import SkillNestLogo from './SkillNestLogo'
 
 const Navbar = () => {
     const { openSignIn } = useClerk()
     const { user } = useUser()
+    const { getToken } = useAuth()
     const navigate = useNavigate()
-    const { setShowRecruiterLogin } = useContext(AppContext)
+    const { setShowRecruiterLogin, backendUrl } = useContext(AppContext)
+    const [msgUnread, setMsgUnread] = useState(0)
     const [mobileOpen, setMobileOpen] = useState(false)
     const menuRef = useRef(null)
 
@@ -22,6 +25,32 @@ const Navbar = () => {
         document.addEventListener('mousedown', handler)
         return () => document.removeEventListener('mousedown', handler)
     }, [])
+
+    useEffect(() => {
+        if (!user) {
+            setMsgUnread(0)
+            return
+        }
+        let cancelled = false
+        const tick = async () => {
+            try {
+                const token = await getToken()
+                if (!token || cancelled) return
+                const { data } = await axios.get(`${backendUrl}/api/users/messages/unread-count`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (!cancelled && data.success) setMsgUnread(data.count || 0)
+            } catch {
+                if (!cancelled) setMsgUnread(0)
+            }
+        }
+        tick()
+        const id = setInterval(tick, 60000)
+        return () => {
+            cancelled = true
+            clearInterval(id)
+        }
+    }, [user, backendUrl, getToken])
 
     return (
         <div className='shadow-sm border-b bg-white sticky top-0 z-50' ref={menuRef}>
@@ -37,6 +66,14 @@ const Navbar = () => {
                         <div className='hidden sm:flex items-center gap-3 text-sm'>
                             <Link to='/applications' className='text-gray-600 hover:text-blue-600 transition-colors font-medium'>
                                 Applied Jobs
+                            </Link>
+                            <Link to='/messages' className='text-gray-600 hover:text-blue-600 transition-colors font-medium inline-flex items-center gap-1.5'>
+                                Messages
+                                {msgUnread > 0 && (
+                                    <span className='bg-indigo-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center'>
+                                        {msgUnread > 99 ? '99+' : msgUnread}
+                                    </span>
+                                )}
                             </Link>
                             <span className='text-gray-300'>|</span>
                             <span className='text-gray-600'>Hi, {user.firstName}</span>
@@ -85,6 +122,18 @@ const Navbar = () => {
                                     className='text-gray-700 font-medium hover:text-blue-600'
                                 >
                                     Applied Jobs
+                                </Link>
+                                <Link
+                                    to='/messages'
+                                    onClick={() => setMobileOpen(false)}
+                                    className='text-gray-700 font-medium hover:text-blue-600 inline-flex items-center gap-2'
+                                >
+                                    Messages
+                                    {msgUnread > 0 && (
+                                        <span className='bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full'>
+                                            {msgUnread > 99 ? '99+' : msgUnread}
+                                        </span>
+                                    )}
                                 </Link>
                                 <div className='flex items-center gap-2'>
                                     <span className='text-gray-600 text-sm'>Hi, {user.firstName}</span>

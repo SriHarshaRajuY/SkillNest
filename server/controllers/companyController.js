@@ -3,7 +3,8 @@ import bcrypt from 'bcrypt'
 import { v2 as cloudinary } from 'cloudinary'
 import generateToken from '../utils/generateToken.js'
 import Job from '../models/Job.js'
-import JobApplication from '../models/JobApplication.js'
+import JobApplication, { PIPELINE_STAGES } from '../models/JobApplication.js'
+import { emitToApplication } from '../realtime/socketHub.js'
 import { removeLocalFile } from '../utils/fileHelpers.js'
 import { getSignedResumeUrl } from './userController.js'
 import aiService from '../services/aiService.js'
@@ -171,28 +172,107 @@ export const getCompanyPostedJobs = async (req, res) => {
     }
 }
 
-// ─── Change application status ────────────────────────────────────────────────
+// ─── Pipeline / legacy status ───────────────────────────────────────────────────
 export const changeJobApplicationStatus = async (req, res) => {
-    const { id, status } = req.body
+    const { id, pipelineStage, status } = req.body
 
-    if (!id || !status) {
-        return res.status(400).json({ success: false, message: 'Application ID and status are required' })
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Application ID is required' })
     }
 
-    const validStatuses = ['Pending', 'Accepted', 'Rejected']
-    if (!validStatuses.includes(status)) {
-        return res.status(400).json({ success: false, message: `Status must be one of: ${validStatuses.join(', ')}` })
+    let stage = pipelineStage
+    if (!stage && status) {
+        if (status === 'Accepted') stage = 'Offer'
+        else if (status === 'Rejected') stage = 'Rejected'
+        else stage = 'Applied'
+    }
+
+    if (!stage || !PIPELINE_STAGES.includes(stage)) {
+        return res.status(400).json({
+            success: false,
+            message: `pipelineStage must be one of: ${PIPELINE_STAGES.join(', ')}`,
+        })
     }
 
     try {
-        const application = await JobApplication.findByIdAndUpdate(id, { status }, { new: true })
+        const application = await JobApplication.findOne({
+            _id: id,
+            companyId: req.company._id,
+        })
         if (!application) {
             return res.status(404).json({ success: false, message: 'Application not found' })
         }
-        res.json({ success: true, message: `Application ${status.toLowerCase()} successfully`, application })
+
+        application.pipelineStage = stage
+        await application.save()
+
+        await application.populate('userId', 'name image resume')
+        await application.populate('jobId', 'title location category level salary')
+
+        emitToApplication(String(application._id), 'pipeline:updated', {
+            applicationId: String(application._id),
+            pipelineStage: application.pipelineStage,
+            pipelineHistory: application.pipelineHistory,
+            status: application.status,
+            updatedAt: application.updatedAt,
+        })
+
+        res.json({
+            success: true,
+            message: 'Pipeline updated',
+            application,
+        })
     } catch (error) {
         console.error('[changeJobApplicationStatus]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to update status' })
+        res.status(500).json({ success: false, message: 'Failed to update pipeline' })
+    }
+}
+
+// ─── Internal hiring-team notes (recruiters only, real-time) ───────────────────
+export const addInternalNote = async (req, res) => {
+    const { applicationId } = req.params
+    const { body, rating } = req.body
+    const text = typeof body === 'string' ? body.trim() : ''
+
+    if (!applicationId || !text) {
+        return res.status(400).json({ success: false, message: 'Note text is required' })
+    }
+
+    let ratingNum
+    if (rating !== undefined && rating !== null && rating !== '') {
+        ratingNum = Number(rating)
+        if (Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+            return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' })
+        }
+    }
+
+    try {
+        const application = await JobApplication.findOne({
+            _id: applicationId,
+            companyId: req.company._id,
+        })
+
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' })
+        }
+
+        application.internalNotes.push({
+            authorCompanyId: req.company._id,
+            authorName: req.company.name,
+            body: text.slice(0, 4000),
+            rating: ratingNum,
+        })
+        await application.save()
+
+        emitToApplication(String(application._id), 'feedback:updated', {
+            applicationId: String(application._id),
+            internalNotes: application.internalNotes,
+        })
+
+        res.status(201).json({ success: true, internalNotes: application.internalNotes })
+    } catch (error) {
+        console.error('[addInternalNote]', error.message)
+        res.status(500).json({ success: false, message: 'Failed to save note' })
     }
 }
 
@@ -259,3 +339,20 @@ export const matchResume = asyncHandler(async (req, res) => {
 
     res.json({ success: true, score: result.score, reason: result.reason });
 })
+
+// ─── AI Diversity Audit ───────────────────────────────────────────────────────
+export const auditJob = asyncHandler(async (req, res) => {
+    const { description } = req.body;
+
+    if (!description || description.trim() === '' || description === '<p><br></p>') {
+        return res.status(400).json({ success: false, message: 'Job description is required for audit.' });
+    }
+
+    try {
+        const result = await aiService.auditJobDescription(description);
+        res.json({ success: true, audit: result });
+    } catch (error) {
+        console.error('[auditJob]', error.message);
+        res.status(500).json({ success: false, message: 'Failed to perform diversity audit.' });
+    }
+});

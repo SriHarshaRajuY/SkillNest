@@ -1,4 +1,5 @@
-import { useContext, useEffect, useState } from 'react'
+import { Fragment, useContext, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import { assets } from '../assets/assets'
 import moment from 'moment'
@@ -8,6 +9,16 @@ import { useAuth, useUser } from '@clerk/clerk-react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import Loading from '../components/Loading'
+import LivePipeline from '../components/LivePipeline'
+import { useSkillNestSocket } from '../hooks/useSkillNestSocket'
+import { PIPELINE_LABELS } from '../constants/pipeline'
+
+function displayPipelineStage(job) {
+    if (job.pipelineStage) return job.pipelineStage
+    if (job.status === 'Accepted') return 'Offer'
+    if (job.status === 'Rejected') return 'Rejected'
+    return 'Applied'
+}
 
 
 const Applications = () => {
@@ -17,6 +28,7 @@ const Applications = () => {
 
     const [isEdit, setIsEdit] = useState(false)
     const [resume, setResume] = useState(null)
+    const [realtimeToken, setRealtimeToken] = useState(null)
 
     const {
         backendUrl,
@@ -24,8 +36,47 @@ const Applications = () => {
         userApplications,
         userDataLoaded,
         fetchUserData,
-        fetchUserApplications
+        fetchUserApplications,
+        setUserApplications,
     } = useContext(AppContext)
+
+    const applicationIds = useMemo(() => userApplications.map((j) => j._id), [userApplications])
+
+    useEffect(() => {
+        if (!user || !userData) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const token = await getToken()
+                if (!token || cancelled) return
+                const { data } = await axios.get(`${backendUrl}/api/users/realtime-token`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
+                if (!cancelled && data.success) setRealtimeToken(data.token)
+            } catch {
+                if (!cancelled) setRealtimeToken(null)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [user, userData, backendUrl, getToken])
+
+    useSkillNestSocket({
+        backendUrl,
+        authToken: realtimeToken,
+        applicationIds,
+        handlers: {
+            'pipeline:updated': (payload) => {
+                const { applicationId, pipelineStage, pipelineHistory, status } = payload
+                setUserApplications((prev) =>
+                    prev.map((a) =>
+                        String(a._id) === String(applicationId)
+                            ? { ...a, pipelineStage, pipelineHistory, status }
+                            : a,
+                    ),
+                )
+            },
+        },
+    })
 
     const updateResume = async () => {
         if (!resume) {
@@ -176,8 +227,11 @@ const Applications = () => {
                     }
                 </div>
 
-                {/* Applications Table */}
-                <h2 className='text-xl font-semibold mb-4'>Jobs Applied</h2>
+                {/* Applications + live pipeline */}
+                <h2 className='text-xl font-semibold mb-1'>Jobs Applied</h2>
+                <p className='text-sm text-gray-500 mb-4'>
+                    Your pipeline updates instantly when recruiters move your application — no more silence after you apply.
+                </p>
                 {userApplications.length === 0
                     ? <div className='text-center py-20 border rounded-lg bg-gray-50'>
                         <div className='text-5xl mb-4'>📋</div>
@@ -191,31 +245,57 @@ const Applications = () => {
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Job Title</th>
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700 max-sm:hidden'>Location</th>
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700 max-sm:hidden'>Applied On</th>
-                                <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Status</th>
+                                <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Stage</th>
+                                <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Inbox</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {userApplications.map((job, index) => (
-                                <tr key={index} className='hover:bg-gray-50 transition-colors'>
-                                    <td className='py-3 px-4 flex items-center gap-2 border-b'>
-                                        <img className='w-8 h-8 rounded-full object-cover' src={job.companyId.image} alt={job.companyId.name} />
-                                        <span className='font-medium'>{job.companyId.name}</span>
-                                    </td>
-                                    <td className='py-2 px-4 border-b'>{job.jobId.title}</td>
-                                    <td className='py-2 px-4 border-b max-sm:hidden text-gray-600'>{job.jobId.location}</td>
-                                    <td className='py-2 px-4 border-b max-sm:hidden text-gray-600'>{moment(job.date).format('DD MMM YYYY')}</td>
-                                    <td className='py-2 px-4 border-b'>
-                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${job.status === 'Accepted'
-                                            ? 'bg-green-100 text-green-700'
-                                            : job.status === 'Rejected'
-                                                ? 'bg-red-100 text-red-700'
-                                                : 'bg-blue-100 text-blue-700'
-                                            }`}>
-                                            {job.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
+                            {userApplications.map((job) => {
+                                const stage = displayPipelineStage(job)
+                                const stageCls =
+                                    stage === 'Rejected'
+                                        ? 'bg-red-100 text-red-700'
+                                        : stage === 'Hired' || stage === 'Offer'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-sky-100 text-sky-800'
+                                return (
+                                    <Fragment key={job._id}>
+                                        <tr className='hover:bg-gray-50 transition-colors'>
+                                            <td className='py-3 px-4 align-middle border-b'>
+                                                <div className='flex items-center gap-2'>
+                                                    <img className='w-8 h-8 rounded-full object-cover' src={job.companyId.image} alt={job.companyId.name} />
+                                                    <span className='font-medium'>{job.companyId.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className='py-2 px-4 border-b align-middle'>{job.jobId.title}</td>
+                                            <td className='py-2 px-4 border-b max-sm:hidden text-gray-600 align-middle'>{job.jobId.location}</td>
+                                            <td className='py-2 px-4 border-b max-sm:hidden text-gray-600 align-middle'>{moment(job.date).format('DD MMM YYYY')}</td>
+                                            <td className='py-2 px-4 border-b align-middle'>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${stageCls}`}>
+                                                    {PIPELINE_LABELS[stage] || stage}
+                                                </span>
+                                            </td>
+                                            <td className='py-2 px-4 border-b align-middle'>
+                                                <Link
+                                                    to={`/messages/${job._id}`}
+                                                    className='text-sm font-medium text-indigo-600 hover:text-indigo-800'
+                                                >
+                                                    Open chat
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                        <tr className='bg-slate-50/90'>
+                                            <td colSpan={6} className='px-4 py-4 border-b border-slate-100'>
+                                                <LivePipeline
+                                                    compact={false}
+                                                    pipelineStage={stage}
+                                                    pipelineHistory={job.pipelineHistory || []}
+                                                />
+                                            </td>
+                                        </tr>
+                                    </Fragment>
+                                )
+                            })}
                         </tbody>
                     </table>
                 }

@@ -8,8 +8,16 @@ import {
     getCompanyPostedJobs,
     changeJobApplicationStatus,
     changeVisibility,
-    matchResume
+    matchResume,
+    addInternalNote,
+    auditJob,
 } from '../controllers/companyController.js'
+import {
+    listCompanyThreads,
+    getCompanyThread,
+    postCompanyMessage,
+    aiInterviewDraft,
+} from '../controllers/messageController.js'
 import { getApplicantResumeSignedUrl } from '../controllers/userController.js'
 import upload from '../config/multer.js'
 import { protectCompany } from '../middleware/authMiddleware.js'
@@ -39,5 +47,12 @@ router.post('/change-status', protectCompany, changeJobApplicationStatus)
 router.post('/change-visibility', protectCompany, changeVisibility)
 router.get('/applicant-resume/:applicationId', protectCompany, getApplicantResumeSignedUrl)
 router.get('/match-resume/:applicationId', protectCompany, matchResume)
+router.post('/applications/:applicationId/internal-notes', protectCompany, addInternalNote)
+router.post('/audit-job', protectCompany, auditJob)
+
+router.get('/messages/threads', protectCompany, listCompanyThreads)
+router.get('/messages/thread/:applicationId', protectCompany, getCompanyThread)
+router.post('/messages', protectCompany, postCompanyMessage)
+router.post('/messages/ai-draft', protectCompany, aiInterviewDraft)
 
 export default router

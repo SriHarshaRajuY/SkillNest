@@ -95,6 +95,16 @@ const Dashboard = () => {
                             <img className='min-w-4 w-5' src={assets.person_tick_icon} alt='' />
                             <p className='max-sm:hidden text-sm font-medium'>View Applications</p>
                         </NavLink>
+
+                        <NavLink
+                            className={({ isActive }) =>
+                                `flex items-center p-3 sm:px-6 gap-2 w-full hover:bg-gray-100 transition-colors ${isActive ? 'bg-blue-100 border-r-4 border-blue-500 text-blue-700' : ''}`
+                            }
+                            to='/dashboard/messages'
+                        >
+                            <span className='min-w-4 w-5 text-center text-lg' aria-hidden>💬</span>
+                            <p className='max-sm:hidden text-sm font-medium'>Messages</p>
+                        </NavLink>
                     </ul>
                 </aside>
 
