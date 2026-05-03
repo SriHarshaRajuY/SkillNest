@@ -44,23 +44,17 @@ app.use(clerkMiddleware())
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'SkillNest API is running ✅' }))
-app.use('/api/company', authLimiter, companyRoutes)
+app.use('/api/company', companyRoutes)
 app.use('/api/jobs', jobRoutes)
 app.use('/api/users', userRoutes)
 
+import { errorHandler, notFound } from './middleware/errorHandler.js'
+
 // ─── 404 ─────────────────────────────────────────────────────────────────────
-app.use((req, res) => {
-    res.status(404).json({ success: false, message: 'Route not found' })
-})
+app.use(notFound)
 
 // ─── Global error handler ────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-    if (err?.name === 'MulterError') {
-        return res.status(400).json({ success: false, message: err.message })
-    }
-    console.error('[Server Error]', err)
-    res.status(500).json({ success: false, message: 'Internal server error' })
-})
+app.use(errorHandler)
 
 // ─── Startup ─────────────────────────────────────────────────────────────────
 const startServer = async () => {

@@ -181,22 +181,33 @@ const ViewApplications = () => {
                                     </td>
                                     <td className='py-3 px-4 border-b'>
                                         {!matchResults[applicant._id] ? (
-                                            <button onClick={() => handleAIMatch(applicant._id)} className='text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors border border-indigo-200'>
-                                                ✨ Get AI Score
+                                            <button onClick={() => handleAIMatch(applicant._id)} className='text-xs bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full hover:bg-indigo-100 transition-all duration-300 shadow-sm border border-indigo-100 font-medium flex items-center gap-1 hover:shadow'>
+                                                <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                                Get AI Score
                                             </button>
                                         ) : matchResults[applicant._id].loading ? (
-                                            <span className='text-xs text-gray-500 animate-pulse'>Analyzing...</span>
+                                            <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 rounded-full w-fit border border-gray-100">
+                                                <svg className="animate-spin h-3 w-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span className='text-[11px] text-gray-500 font-medium tracking-wide'>Analyzing...</span>
+                                            </div>
                                         ) : matchResults[applicant._id].score ? (
-                                            <div className='flex flex-col gap-1'>
-                                                <span className={`text-xs font-bold px-2 py-1 rounded w-fit ${matchResults[applicant._id].score >= 80 ? 'bg-green-100 text-green-700' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                            <div className='flex flex-col gap-1.5'>
+                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-md shadow-sm w-fit flex items-center gap-1 ${matchResults[applicant._id].score >= 80 ? 'bg-green-50 text-green-700 border border-green-200' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${matchResults[applicant._id].score >= 80 ? 'bg-green-500' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
                                                     {matchResults[applicant._id].score}% Match
                                                 </span>
-                                                <span className='text-[10px] text-gray-500 max-w-[200px] leading-tight'>
+                                                <span className='text-[11px] text-gray-500 max-w-[220px] leading-relaxed'>
                                                     {matchResults[applicant._id].reason}
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className='text-xs text-red-500'>Error</span>
+                                            <div className="flex items-center gap-1 text-red-500 bg-red-50 px-2 py-1 rounded w-fit border border-red-100">
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                <span className='text-[11px] font-medium'>Error</span>
+                                            </div>
                                         )}
                                     </td>
                                     <td className='py-3 px-4 border-b'>
@@ -260,11 +271,11 @@ const ViewApplications = () => {
                                                 <p className='text-xs text-gray-500 truncate mb-2'>{applicant.jobId.title}</p>
                                                 
                                                 {/* Resume & AI Action */}
-                                                <div className='flex flex-wrap items-center gap-2 mt-2'>
+                                                <div className='flex flex-wrap items-center gap-2 mt-3'>
                                                     {applicant.userId.resume && (
                                                         <button
                                                             onClick={() => viewApplicantResume(applicant._id)}
-                                                            className='text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100'
+                                                            className='text-xs text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-md hover:bg-blue-100 font-medium transition-colors'
                                                         >
                                                             View Resume
                                                         </button>
@@ -273,18 +284,29 @@ const ViewApplications = () => {
                                                     {!matchResults[applicant._id] ? (
                                                         <button 
                                                             onClick={() => handleAIMatch(applicant._id)} 
-                                                            className='text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 border border-indigo-200'
+                                                            className='text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1.5 rounded-md hover:bg-indigo-100 border border-indigo-100 shadow-sm transition-all flex items-center gap-1 font-medium'
                                                         >
-                                                            ✨ AI Match
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                                            AI Match
                                                         </button>
                                                     ) : matchResults[applicant._id].loading ? (
-                                                        <span className='text-xs text-gray-400'>Loading...</span>
+                                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-md border border-gray-100">
+                                                            <svg className="animate-spin h-3 w-3 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            <span className='text-[10px] text-gray-500 font-medium'>Analyzing</span>
+                                                        </div>
                                                     ) : matchResults[applicant._id].score ? (
-                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${matchResults[applicant._id].score >= 80 ? 'bg-green-100 text-green-700' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded-md shadow-sm border flex items-center gap-1 ${matchResults[applicant._id].score >= 80 ? 'bg-green-50 text-green-700 border-green-200' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                                            <div className={`w-1 h-1 rounded-full ${matchResults[applicant._id].score >= 80 ? 'bg-green-500' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
                                                             {matchResults[applicant._id].score}% Match
                                                         </span>
                                                     ) : (
-                                                        <span className='text-xs text-red-500'>Error</span>
+                                                        <span className='text-xs text-red-500 bg-red-50 px-2 py-1 rounded-md border border-red-100 flex items-center gap-1'>
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                            Error
+                                                        </span>
                                                     )}
                                                 </div>
                                                 

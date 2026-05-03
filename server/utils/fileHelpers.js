@@ -26,7 +26,7 @@ export const extractCloudinaryAsset = (url) => {
     // Detect resource type from the URL path
     const resourceType = url.includes('/raw/upload/') ? 'raw'
         : url.includes('/video/upload/') ? 'video'
-        : 'image'
+            : 'image'
 
     const uploadIndex = url.indexOf('/upload/')
     if (uploadIndex === -1) return null
@@ -36,11 +36,15 @@ export const extractCloudinaryAsset = (url) => {
     // Strip optional version prefix (e.g. v1234567890/)
     afterUpload = afterUpload.replace(/^v\d+\//, '')
 
+    // Extract extension
+    const extMatch = afterUpload.match(/\.([^.]+)$/)
+    const extension = extMatch ? extMatch[1].toLowerCase() : ''
+    
     // For raw files: keep the extension (e.g. resume.pdf)
     // For images: strip the extension (Cloudinary public_id has no extension)
     const publicId = resourceType === 'raw'
         ? afterUpload
         : afterUpload.replace(/\.[^.]+$/, '')
 
-    return { publicId, resourceType }
+    return { publicId, resourceType, extension }
 }

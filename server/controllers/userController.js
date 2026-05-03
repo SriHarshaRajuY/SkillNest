@@ -44,7 +44,7 @@ const getOrCreateUser = async (userId) => {
  * Generate a time-limited signed URL for a Cloudinary-hosted PDF (raw resource).
  * Uses private_download_url which is the correct API for raw resource type.
  */
-const getSignedResumeUrl = (resumeUrl) => {
+export const getSignedResumeUrl = (resumeUrl) => {
     if (!resumeUrl) return null
     if (!resumeUrl.includes('cloudinary.com')) return resumeUrl
 
@@ -54,22 +54,20 @@ const getSignedResumeUrl = (resumeUrl) => {
     const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour
 
     if (asset.resourceType === 'raw') {
-        // private_download_url is the only correct method for raw/PDF files.
-        // cloudinary.url() with sign_url does NOT work for raw resources.
-        return cloudinary.utils.private_download_url(asset.publicId, 'pdf', {
+        // Since we migrated assets to private, or for new private uploads, private_download_url works.
+        // The publicId already includes the extension.
+        return cloudinary.utils.private_download_url(asset.publicId, '', {
             resource_type: 'raw',
             expires_at: expiresAt,
             attachment: false,
         })
     }
 
-    // For image resources, use standard signed URL
-    return cloudinary.url(asset.publicId, {
+    // For image resources, private_download_url also works if they are private.
+    return cloudinary.utils.private_download_url(asset.publicId, asset.extension || 'pdf', {
         resource_type: asset.resourceType,
-        type: 'upload',
-        secure: true,
-        sign_url: true,
         expires_at: expiresAt,
+        attachment: false,
     })
 }
 
@@ -167,10 +165,11 @@ export const updateUserResume = async (req, res) => {
         }
 
         // Upload new resume — must use resource_type: 'raw' for PDFs
-        // Using 'auto' causes inconsistency: Cloudinary returns 'raw' type but
-        // the public_id handling differs, breaking signed URL generation later.
+        // We use type: 'private' to ensure Cloudinary's Admin API private_download_url
+        // works securely without triggering Strict Delivery profile blocks.
         const upload = await cloudinary.uploader.upload(resumeFile.path, {
             resource_type: 'raw',
+            type: 'private',
             folder: 'skillnest/resumes',
             use_filename: true,
             unique_filename: true,
