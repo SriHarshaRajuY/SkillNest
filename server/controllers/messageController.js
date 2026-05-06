@@ -88,6 +88,11 @@ export const postUserMessage = async (req, res) => {
         if (!app) {
             return res.status(403).json({ success: false, message: 'Not authorized' })
         }
+
+        const allowedStages = ['Screening', 'Interview', 'Offer', 'Hired']
+        if (!allowedStages.includes(app.pipelineStage)) {
+            return res.status(403).json({ success: false, message: 'Messaging is only available after you have been shortlisted.' })
+        }
         const msg = await Message.create({
             applicationId,
             body: text.slice(0, 8000),
@@ -248,6 +253,11 @@ export const postCompanyMessage = async (req, res) => {
         const app = await loadApplicationForCompany(companyId, applicationId)
         if (!app) {
             return res.status(403).json({ success: false, message: 'Not authorized' })
+        }
+
+        const allowedStages = ['Screening', 'Interview', 'Offer', 'Hired']
+        if (!allowedStages.includes(app.pipelineStage)) {
+            return res.status(403).json({ success: false, message: 'Messaging is only available for shortlisted candidates.' })
         }
         const msg = await Message.create({
             applicationId,

@@ -5,6 +5,8 @@ import User from '../models/User.js'
 import { v2 as cloudinary } from 'cloudinary'
 import { clerkClient } from '@clerk/express'
 import { removeLocalFile, extractCloudinaryAsset } from '../utils/fileHelpers.js'
+import Joi from 'joi'
+import { processApplication } from '../services/applicationService.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -107,38 +109,36 @@ export const getUserData = async (req, res) => {
 
 // POST /api/users/apply
 export const applyForJob = async (req, res) => {
-    const { jobId } = req.body
     const userId = getUserId(req)
 
-    if (!jobId) return res.status(400).json({ success: false, message: 'Job ID is required' })
+    // Joi Validation for Input
+    const schema = Joi.object({
+        jobId: Joi.string().required(),
+        assessmentScore: Joi.number().min(0).max(100).optional()
+    })
+
+    const { error, value } = schema.validate(req.body)
+    if (error) {
+        return res.status(400).json({ success: false, message: error.details[0].message })
+    }
 
     try {
-        const user = await getOrCreateUser(userId)
-
-        if (!user?.resume) {
-            return res.status(400).json({ success: false, message: 'Please upload your resume before applying' })
-        }
-
-        const jobData = await Job.findById(jobId)
-        if (!jobData) return res.status(404).json({ success: false, message: 'Job not found' })
-        if (!jobData.visible) return res.status(400).json({ success: false, message: 'This job is no longer accepting applications' })
-
-        const existing = await JobApplication.findOne({ jobId, userId })
-        if (existing) return res.status(409).json({ success: false, message: 'You have already applied for this job' })
-
-        await JobApplication.create({
-            companyId: jobData.companyId,
+        await processApplication({
             userId,
-            jobId,
-            date: Date.now(),
+            jobId: value.jobId,
+            assessmentScore: value.assessmentScore
         })
 
         res.status(201).json({ success: true, message: 'Application submitted successfully!' })
-    } catch (error) {
-        if (error.code === 11000) {
+    } catch (err) {
+        // Handle explicit logic errors gracefully
+        if (['User not found', 'Job not found', 'This job is no longer accepting applications', 'Please upload your resume before applying'].includes(err.message)) {
+            return res.status(400).json({ success: false, message: err.message })
+        }
+        if (err.message === 'You have already applied for this job' || err.code === 11000) {
             return res.status(409).json({ success: false, message: 'You have already applied for this job' })
         }
-        console.error('[applyForJob]', error.message)
+        console.error('[applyForJob]', err.message)
         res.status(500).json({ success: false, message: 'Failed to submit application' })
     }
 }

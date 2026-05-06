@@ -39,6 +39,10 @@ const jobApplicationSchema = new mongoose.Schema({
     /** Recruiter-only — stripped in candidate API responses */
     internalNotes: { type: [internalNoteSchema], default: [] },
     date: { type: Number, required: true },
+
+    // Advanced Evaluation metrics
+    matchScore: { type: Number, default: 0 },
+    assessmentScore: { type: Number, default: 0 }
 }, { timestamps: true })
 
 jobApplicationSchema.pre('save', function (next) {
@@ -61,6 +65,10 @@ jobApplicationSchema.pre('save', function (next) {
 
 // Prevent duplicate applications at the DB level
 jobApplicationSchema.index({ userId: 1, jobId: 1 }, { unique: true })
+
+// Index for performant querying of pipeline stages and company loads
+jobApplicationSchema.index({ companyId: 1, pipelineStage: 1 })
+jobApplicationSchema.index({ jobId: 1, date: -1 })
 
 const JobApplication = mongoose.models.JobApplication || mongoose.model('JobApplication', jobApplicationSchema)
 

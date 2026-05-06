@@ -9,6 +9,7 @@ import connectDB, { migrateLegacyApplications } from './config/db.js'
 import connectCloudinary from './config/cloudinary.js'
 import { initRealtime } from './realtime/socketHub.js'
 import { clerkWebhooks } from './controllers/webhooks.js'
+import { initCredibilityCron } from './jobs/credibilityCron.js'
 import companyRoutes from './routes/companyRoutes.js'
 import jobRoutes from './routes/jobRoutes.js'
 import userRoutes from './routes/userRoutes.js'
@@ -64,6 +65,7 @@ const startServer = async () => {
         await connectDB()
         await migrateLegacyApplications()
         connectCloudinary()
+        initCredibilityCron() // Start the background jobs
 
         const server = http.createServer(app)
         initRealtime(server)

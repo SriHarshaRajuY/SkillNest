@@ -182,28 +182,34 @@ export default function MessageChatPanel({
             </div>
 
             <footer className='p-3 bg-white border-t border-slate-200'>
-                <div className='flex gap-2 items-end'>
-                    <textarea
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder='Write a secure message…'
-                        rows={2}
-                        className='flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none'
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault()
-                                send()
-                            }
-                        }}
-                    />
-                    <button
-                        type='button'
-                        onClick={send}
-                        className='shrink-0 h-[42px] px-5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors'
-                    >
-                        Send
-                    </button>
-                </div>
+                {meta && !['Screening', 'Interview', 'Offer', 'Hired'].includes(meta.pipelineStage) ? (
+                    <div className='text-center py-2 text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-200'>
+                        Messaging is restricted. Candidate must be shortlisted to enable chat.
+                    </div>
+                ) : (
+                    <div className='flex gap-2 items-end'>
+                        <textarea
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder='Write a secure message…'
+                            rows={2}
+                            className='flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none'
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    send()
+                                }
+                            }}
+                        />
+                        <button
+                            type='button'
+                            onClick={send}
+                            className='shrink-0 h-[42px] px-5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors'
+                        >
+                            Send
+                        </button>
+                    </div>
+                )}
             </footer>
         </div>
     )
