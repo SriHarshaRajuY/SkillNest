@@ -76,7 +76,7 @@ export default function MessageChatPanel({
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages.length])
+    }, [messages])
 
     const send = async () => {
         const body = text.trim()

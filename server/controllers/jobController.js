@@ -36,8 +36,11 @@ export const getJobs = async (req, res) => {
 // Get Single Job Using JobID
 export const getJobById = async (req, res) => {
     try {
-
         const { id } = req.params
+
+        if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+            return res.status(400).json({ success: false, message: 'Invalid Job ID format' })
+        }
 
         const job = await Job.findById(id)
             .populate({
@@ -46,7 +49,7 @@ export const getJobById = async (req, res) => {
             })
 
         if (!job) {
-            return res.json({
+            return res.status(404).json({
                 success: false,
                 message: 'Job not found'
             })
@@ -58,6 +61,6 @@ export const getJobById = async (req, res) => {
         })
 
     } catch (error) {
-        res.json({ success: false, message: error.message })
+        res.status(500).json({ success: false, message: error.message })
     }
 }

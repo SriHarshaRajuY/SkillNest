@@ -24,11 +24,21 @@ const storage = multer.diskStorage({
 
 // Allow only PDF for resumes and images for company logos
 const fileFilter = (req, file, cb) => {
-    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/jpg']
-    if (allowedMimes.includes(file.mimetype)) {
-        cb(null, true)
+    if (file.fieldname === 'resume') {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true)
+        } else {
+            cb(new Error('Resumes must be in PDF format'), false)
+        }
+    } else if (file.fieldname === 'image') {
+        const imageMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+        if (imageMimes.includes(file.mimetype)) {
+            cb(null, true)
+        } else {
+            cb(new Error('Logo must be an image file (JPEG, PNG, WEBP)'), false)
+        }
     } else {
-        cb(new Error('Only PDF and image files are allowed'), false)
+        cb(null, true)
     }
 }
 

@@ -49,7 +49,13 @@ export const AppContextProvider = ({ children }) => {
                 toast.error(data.message)
             }
         } catch (error) {
-            toast.error('Failed to load company data')
+            if (error.response?.status === 401) {
+                setCompanyToken(null)
+                localStorage.removeItem('companyToken')
+                toast.error('Session expired. Please login again.')
+            } else {
+                toast.error('Failed to load company data')
+            }
         } finally {
             setCompanyLoaded(true)
         }
