@@ -1,43 +1,53 @@
 graph TD
-    User((User/Candidate))
+    User((Candidate))
     Recruiter((Recruiter))
     
-    subgraph Frontend [React Frontend]
-        UI[UI Components]
-        Context[AppContext]
-        Hooks[Custom Hooks]
-        Sentry[Sentry Monitoring]
+    subgraph Frontend ["Frontend Layer (React 18 + Vite)"]
+        UI[UI Components / Kanban]
+        Context[AppContext / Token Mgmt]
+        Hooks[Custom Hooks / useSocket]
+        SocketClient[Socket.io Client]
     end
     
-    subgraph Backend [Express Backend]
-        API[REST API]
-        Socket[Socket.io Hub]
-        Auth[Clerk Auth / JWT]
-        AI[AI Service - Gemini]
-        Cron[Credibility Cron Jobs]
+    subgraph Security ["Security & Documentation"]
+        Swagger[Swagger UI / api-docs]
+        Multer[Multer / PDF & Img Filter]
+        RateLimit[Express Rate Limiter]
+        Clerk[Clerk Auth / JWT Middleware]
     end
     
-    subgraph Data [Data & Storage]
-        Mongo[(MongoDB)]
-        Redis[(Redis Cache)]
-        Cloudinary[(Cloudinary PDF/Img)]
+    subgraph Backend ["Backend Layer (Node.js + Express)"]
+        API[REST API Endpoints]
+        SocketHub[Socket.io Hub / Rooms]
+        AI[AI Service / Gemini NLP]
     end
     
-    User --> UI
-    Recruiter --> UI
+    subgraph Data ["Data & Optimization Layer"]
+        Mongo[(MongoDB Atlas)]
+        Redis[(Upstash Redis Cache)]
+        Cloudinary[(Cloudinary Storage)]
+    end
+    
+    %% Connections
+    User -->|Interaction| UI
+    Recruiter -->|Interaction| UI
+    
     UI --> Context
-    Context --> API
-    Context --> Socket
+    UI --> SocketClient
     
-    API --> Auth
-    API --> AI
+    Context -->|HTTPS| RateLimit
+    RateLimit --> Clerk
+    Clerk --> API
+    
+    API --> Swagger
+    API --> Multer
+    Multer --> Cloudinary
+    
     API --> Mongo
-    API --> Cloudinary
+    API --> AI
+    AI -->|Cache Match| Redis
     
-    AI --> Redis
-    
-    Socket --> Redis
-    Socket --> User
-    Socket --> Recruiter
-    
-    Cron --> Mongo
+    SocketClient <--> SocketHub
+    SocketHub --> Redis
+    SocketHub <--> User
+    SocketHub <--> Recruiter
