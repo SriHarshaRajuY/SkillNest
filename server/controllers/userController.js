@@ -7,6 +7,7 @@ import { clerkClient } from '@clerk/express'
 import { removeLocalFile, extractCloudinaryAsset } from '../utils/fileHelpers.js'
 import Joi from 'joi'
 import { processApplication } from '../services/applicationService.js'
+import aiService from '../services/aiService.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -251,5 +252,38 @@ export const getApplicantResumeSignedUrl = async (req, res) => {
     } catch (error) {
         console.error('[getApplicantResumeSignedUrl]', error.message)
         res.status(500).json({ success: false, message: 'Failed to generate resume link' })
+    }
+}
+
+// GET /api/users/optimize-resume/:jobId
+export const optimizeResume = async (req, res) => {
+    try {
+        const userId = getUserId(req)
+        const { jobId } = req.params
+
+        const user = await User.findById(userId)
+        const job = await Job.findById(jobId)
+
+        if (!user?.resume) {
+            return res.status(400).json({ success: false, message: 'Please upload a resume first' })
+        }
+        if (!job) {
+            return res.status(404).json({ success: false, message: 'Job not found' })
+        }
+
+        const signedUrl = getSignedResumeUrl(user.resume)
+        const response = await fetch(signedUrl)
+        if (!response.ok) throw new Error('Failed to fetch resume')
+        
+        const arrayBuffer = await response.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const resumeText = await aiService.parsePDF(buffer)
+
+        const optimization = await aiService.generateResumeOptimization(resumeText, job.description)
+
+        res.json({ success: true, ...optimization })
+    } catch (error) {
+        console.error('[optimizeResume]', error.message)
+        res.status(500).json({ success: false, message: 'Failed to optimize resume' })
     }
 }

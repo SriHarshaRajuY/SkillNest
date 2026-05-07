@@ -1,0 +1,100 @@
+import { Link } from 'react-router-dom'
+import { PIPELINE_STAGES, PIPELINE_LABELS } from '../constants/pipeline'
+
+const ApplicationsTable = ({
+    applicants,
+    selectedId,
+    setSelectedId,
+    viewApplicantResume,
+    handleAIMatch,
+    matchResults,
+    displayPipelineStage,
+    changePipeline
+}) => {
+    return (
+        <div className='overflow-x-auto rounded-xl border border-gray-200 shadow-sm'>
+            <table className='min-w-full bg-white max-sm:text-sm'>
+                <thead className='bg-gray-50'>
+                    <tr className='border-b'>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>#</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>Applicant</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700 max-sm:hidden'>Job</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>Resume</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>AI</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>Pipeline</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>Chat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {applicants.map((applicant, index) => (
+                        <tr
+                            key={applicant._id}
+                            className={`text-gray-700 hover:bg-gray-50 cursor-pointer ${String(selectedId) === String(applicant._id) ? 'bg-indigo-50/50' : ''}`}
+                            onClick={() => setSelectedId(applicant._id)}
+                        >
+                            <td className='py-3 px-4 border-b text-center'>{index + 1}</td>
+                            <td className='py-3 px-4 border-b'>
+                                <div className='flex items-center gap-2'>
+                                    <img className='w-9 h-9 rounded-full object-cover max-sm:hidden' src={applicant.userId.image} alt='' />
+                                    <span className='font-medium'>{applicant.userId.name}</span>
+                                </div>
+                            </td>
+                            <td className='py-3 px-4 border-b max-sm:hidden'>{applicant.jobId.title}</td>
+                            <td className='py-3 px-4 border-b'>
+                                {applicant.userId.resume ? (
+                                    <button
+                                        type='button'
+                                        onClick={(e) => { e.stopPropagation(); viewApplicantResume(applicant._id) }}
+                                        className='bg-blue-50 text-blue-500 px-3 py-1 rounded hover:bg-blue-100 text-sm'
+                                    >
+                                        View
+                                    </button>
+                                ) : (
+                                    <span className='text-gray-400 text-sm'>—</span>
+                                )}
+                            </td>
+                            <td className='py-3 px-4 border-b'>
+                                {!matchResults[applicant._id] ? (
+                                    <button
+                                        type='button'
+                                        onClick={(e) => { e.stopPropagation(); handleAIMatch(applicant._id) }}
+                                        className='text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full font-medium'
+                                    >
+                                        Score
+                                    </button>
+                                ) : matchResults[applicant._id].loading ? (
+                                    <span className='text-xs text-gray-400'>…</span>
+                                ) : matchResults[applicant._id].score ? (
+                                    <span className='text-xs font-bold text-indigo-700'>{matchResults[applicant._id].score}%</span>
+                                ) : (
+                                    <span className='text-xs text-red-500'>Err</span>
+                                )}
+                            </td>
+                            <td className='py-3 px-4 border-b' onClick={(e) => e.stopPropagation()}>
+                                <select
+                                    value={displayPipelineStage(applicant)}
+                                    onChange={(e) => changePipeline(applicant._id, e.target.value)}
+                                    className='text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 outline-none max-w-[140px]'
+                                >
+                                    {PIPELINE_STAGES.map((s) => (
+                                        <option key={s} value={s}>{PIPELINE_LABELS[s]}</option>
+                                    ))}
+                                </select>
+                            </td>
+                            <td className='py-3 px-4 border-b' onClick={(e) => e.stopPropagation()}>
+                                <Link
+                                    to={`/dashboard/messages/${applicant._id}`}
+                                    className='text-sm font-semibold text-indigo-600 hover:text-indigo-800'
+                                >
+                                    Open
+                                </Link>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
+export default ApplicationsTable

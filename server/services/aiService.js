@@ -164,6 +164,58 @@ ${jobDescription.replace(/<[^>]+>/g, ' ').slice(0, 3000)}
             throw new Error('Failed to audit the job description using AI.')
         }
     }
+
+    /**
+     * AI-Powered Resume Optimizer
+     */
+    async generateResumeOptimization(resumeText, jobDescription) {
+        if (!this.model) {
+            throw new Error('AI Service is currently unavailable due to missing API Key configuration.')
+        }
+
+        const prompt = `
+You are a senior career coach and resume expert.
+Analyze the provided Resume Text against the Job Description.
+Identify missing keywords, suggest better bullet points for impact, and provide a list of top 5 improvements to increase the ATS score.
+Return ONLY valid JSON in the exact format:
+{
+  "atsScore": 65,
+  "missingKeywords": ["Redis", "Docker", "Microservices"],
+  "improvedBullets": [
+    "Before: Worked on backend. After: Architected scalable Node.js microservices using Redis for 40% faster data retrieval.",
+    "Before: Used Git. After: Led version control workflows and CI/CD pipelines for a team of 10."
+  ],
+  "topImprovements": [
+    "Add more metrics-driven achievements.",
+    "Include a specific section for cloud technologies."
+  ]
+}
+
+Job Description:
+${jobDescription.replace(/<[^>]+>/g, ' ').slice(0, 2000)}
+
+Resume Text:
+${resumeText.slice(0, 4000)}
+`
+        try {
+            const result = await this.model.generateContent(prompt)
+            const responseText = result.response.text()
+
+            let cleanText = responseText.trim()
+            const firstBrace = cleanText.indexOf('{')
+            const lastBrace = cleanText.lastIndexOf('}')
+            
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                cleanText = cleanText.substring(firstBrace, lastBrace + 1)
+            }
+
+            const parsed = JSON.parse(cleanText)
+            return parsed
+        } catch (error) {
+            console.error('[AIService.generateResumeOptimization] Error:', error.message)
+            throw new Error('Failed to optimize resume using AI.')
+        }
+    }
 }
 
 export default new AIService()

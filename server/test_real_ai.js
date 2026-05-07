@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import mongoose from 'mongoose';
 import JobApplication from './models/JobApplication.js';
 import { getSignedResumeUrl } from './controllers/userController.js';
 import aiService from './services/aiService.js';
-import 'dotenv/config';
 
 const uri = 'mongodb+srv://sriharsharajuy_db_user:skillnest@cluster0.ozeqynm.mongodb.net/job-portal';
 

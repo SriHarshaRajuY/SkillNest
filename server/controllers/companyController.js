@@ -9,6 +9,7 @@ import { removeLocalFile } from '../utils/fileHelpers.js'
 import { getSignedResumeUrl } from './userController.js'
 import aiService from '../services/aiService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
+import { cacheGet, cacheSet } from '../utils/redisClient.js'
 
 // ─── Register a new company ───────────────────────────────────────────────────
 export const registerCompany = async (req, res) => {
@@ -302,10 +303,18 @@ export const changeVisibility = async (req, res) => {
     }
 }
 
+
 // ─── AI Resume Matcher ────────────────────────────────────────────────────────
 export const matchResume = asyncHandler(async (req, res) => {
     const { applicationId } = req.params;
     const companyId = req.company._id;
+
+    // Check cache first
+    const cacheKey = `match:${applicationId}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+        return res.json({ success: true, ...cached, cached: true });
+    }
 
     const application = await JobApplication.findById(applicationId)
         .populate('userId', 'resume')
@@ -336,6 +345,9 @@ export const matchResume = asyncHandler(async (req, res) => {
     const jobDescription = application.jobId.description;
     
     const result = await aiService.generateMatchScore(resumeText, jobDescription);
+
+    // Store in cache for 24 hours
+    await cacheSet(cacheKey, { score: result.score, reason: result.reason });
 
     res.json({ success: true, score: result.score, reason: result.reason });
 })

@@ -6,6 +6,7 @@ import {
     updateUserResume,
     getResumeSignedUrl,
     getRealtimeToken,
+    optimizeResume,
 } from '../controllers/userController.js'
 import {
     getUserUnreadCount,
@@ -33,6 +34,7 @@ router.post('/apply', protectUser, applyLimiter, applyForJob)
 router.get('/applications', protectUser, getUserJobApplications)
 router.post('/update-resume', protectUser, upload.single('resume'), updateUserResume)
 router.get('/resume', protectUser, getResumeSignedUrl)
+router.get('/optimize-resume/:jobId', protectUser, optimizeResume)
 
 router.get('/messages/unread-count', protectUser, getUserUnreadCount)
 router.get('/messages/threads', protectUser, listUserThreads)

@@ -2,6 +2,7 @@ import http from 'http'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import morgan from 'morgan'
 import { rateLimit } from 'express-rate-limit'
 import 'dotenv/config'
 import { clerkMiddleware } from '@clerk/express'
@@ -13,13 +14,16 @@ import { initCredibilityCron } from './jobs/credibilityCron.js'
 import companyRoutes from './routes/companyRoutes.js'
 import jobRoutes from './routes/jobRoutes.js'
 import userRoutes from './routes/userRoutes.js'
+import setupSwagger from './config/swagger.js'
 
 const app = express()
+setupSwagger(app)
 const PORT = process.env.PORT || 5000
 
-// ─── Security headers ────────────────────────────────────────────────────────
+// ─── Security & Logging ───────────────────────────────────────────────────────
 app.disable('x-powered-by')
 app.use(helmet({ contentSecurityPolicy: false }))
+app.use(morgan('dev'))
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
@@ -59,6 +63,8 @@ app.use(notFound)
 // ─── Global error handler ────────────────────────────────────────────────────
 app.use(errorHandler)
 
+export { app }
+
 // ─── Startup ─────────────────────────────────────────────────────────────────
 const startServer = async () => {
     try {
@@ -88,4 +94,6 @@ const startServer = async () => {
     }
 }
 
-startServer()
+if (process.env.NODE_ENV !== 'test') {
+    startServer()
+}

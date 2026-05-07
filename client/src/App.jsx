@@ -17,6 +17,8 @@ import 'quill/dist/quill.snow.css'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 
+import ErrorBoundary from './components/ErrorBoundary'
+
 const App = () => {
     const { showRecruiterLogin } = useContext(AppContext)
 
@@ -24,7 +26,8 @@ const App = () => {
         <div className='min-h-screen bg-white text-gray-900'>
             {showRecruiterLogin && <RecruiterLogin />}
             <ToastContainer position='top-right' autoClose={3500} closeOnClick />
-            <Routes>
+            <ErrorBoundary>
+                <Routes>
                 <Route path='/' element={<Home />} />
                 <Route path='/apply-job/:id' element={<ApplyJob />} />
                 <Route path='/applications' element={<Applications />} />
@@ -46,6 +49,7 @@ const App = () => {
                 </Route>
                 <Route path='*' element={<NotFound />} />
             </Routes>
+            </ErrorBoundary>
         </div>
     )
 }

@@ -1,0 +1,43 @@
+graph TD
+    User((User/Candidate))
+    Recruiter((Recruiter))
+    
+    subgraph Frontend [React Frontend]
+        UI[UI Components]
+        Context[AppContext]
+        Hooks[Custom Hooks]
+        Sentry[Sentry Monitoring]
+    end
+    
+    subgraph Backend [Express Backend]
+        API[REST API]
+        Socket[Socket.io Hub]
+        Auth[Clerk Auth / JWT]
+        AI[AI Service - Gemini]
+        Cron[Credibility Cron Jobs]
+    end
+    
+    subgraph Data [Data & Storage]
+        Mongo[(MongoDB)]
+        Redis[(Redis Cache)]
+        Cloudinary[(Cloudinary PDF/Img)]
+    end
+    
+    User --> UI
+    Recruiter --> UI
+    UI --> Context
+    Context --> API
+    Context --> Socket
+    
+    API --> Auth
+    API --> AI
+    API --> Mongo
+    API --> Cloudinary
+    
+    AI --> Redis
+    
+    Socket --> Redis
+    Socket --> User
+    Socket --> Recruiter
+    
+    Cron --> Mongo

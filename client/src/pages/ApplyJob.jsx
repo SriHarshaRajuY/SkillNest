@@ -138,6 +138,17 @@ const ApplyJob = () => {
             <div className='flex flex-col justify-center text-end text-sm max-md:mx-auto max-md:text-center'>
               <button onClick={applyHandler} className='bg-blue-600 p-2.5 px-10 text-white rounded'>{isAlreadyApplied ? 'Already Applied' : 'Apply Now'}</button>
               <p className='mt-1 text-gray-600'>Posted {moment(JobData.date).fromNow()}</p>
+              
+              {/* AI Transparency Disclosure */}
+              <div className='mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-left max-md:text-center'>
+                <div className='flex items-center gap-2 text-indigo-800 font-semibold mb-1 justify-end max-md:justify-center'>
+                  <span className='text-[10px] bg-indigo-200 px-1.5 py-0.5 rounded uppercase tracking-wider'>AI Assisted</span>
+                  <img src={assets.info_icon} className='w-4 h-4 opacity-70' alt="" />
+                </div>
+                <p className='text-[11px] text-indigo-600 leading-tight'>
+                  Your application will be analyzed by our ethical AI to help recruiters understand your fit. Final hiring decisions are always made by humans.
+                </p>
+              </div>
             </div>
 
           </div>
