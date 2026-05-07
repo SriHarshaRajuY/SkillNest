@@ -1,80 +1,144 @@
-# SkillNest 🚀
+# 🚀 SkillNest: AI-Powered Recruitment Ecosystem
 
-SkillNest is a high-performance, AI-powered recruitment platform designed to bridge the gap between recruiters and candidates. It features real-time messaging, automated resume matching using Google Gemini AI, and a robust recruitment pipeline.
+SkillNest is a professional-grade MERN (MongoDB, Express, React, Node) platform designed to revolutionize the recruitment process through ethically-trained AI, real-time communication, and enterprise-level architecture.
 
-## ✨ Features
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
+![Ethics](https://img.shields.io/badge/AI-Ethical%20Audit-indigo.svg)
 
-- **AI-Powered Evaluation**: Automated resume matching and job description audits using Google Gemini.
-- **Real-time Pipeline**: Kanban-style recruitment dashboard with real-time status updates via WebSockets.
-- **Secure Messaging**: Integrated in-app chat for seamless candidate-recruiter communication.
-- **Smart Filtering**: Automatic candidate screening based on skill matching and assessment scores.
-- **Security First**: Implementation of rate limiting, secure headers (Helmet), and JWT authentication.
+---
+
+## ✨ Key Features
+
+### 🧠 Intelligent Recruiting
+- **AI Resume Matcher**: Leverages Google Gemini AI to analyze candidate resumes against job descriptions, providing an objective "Fit Score."
+- **DEI Job Audit**: Automatically audits job descriptions for biased language to ensure inclusive recruiting practices.
+- **AI Resume Optimizer**: Empowers candidates with actionable suggestions to improve their ATS scores.
+
+### 🛠 Recruiter Dashboard
+- **Kanban Board**: Drag-and-drop interface for managing candidate pipelines (Applied -> Shortlisted -> Interview -> Hired/Rejected).
+- **Real-time Messaging**: Instant recruiter-candidate communication powered by Socket.io.
+- **Application Analytics**: Visual tracking of application trends and candidate demographics.
+
+### ⚡ Performance & Scale
+- **Redis Caching**: Optimized AI response times and reduced API costs by caching match results via Upstash Redis.
+- **Cloudinary Integration**: Secure, time-limited signed URLs for viewing candidate resumes without exposing raw data.
+- **Rate Limiting**: Protected authentication and application routes using `express-rate-limit`.
+
+---
+
+## 🏗 System Architecture
+
+SkillNest follows a modular architecture designed for high availability and security.
+
+```mermaid
+graph TD
+    User((User/Recruiter)) -->|React + Vite| Frontend[Frontend UI]
+    Frontend -->|JWT Auth| Backend[Express API]
+    Backend -->|Queries| MongoDB[(MongoDB Atlas)]
+    Backend -->|Cache| Redis[(Upstash Redis)]
+    Backend -->|Analysis| Gemini[Gemini AI]
+    Backend -->|Storage| Cloudinary[Cloudinary]
+    Backend -->|Realtime| Socket[Socket.io Hub]
+```
+
+---
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React, Vite, Tailwind CSS, Sentry.
-- **Backend**: Node.js, Express, MongoDB (Mongoose), Socket.io.
-- **AI Integration**: Google Generative AI (Gemini).
-- **Authentication**: Clerk & Custom JWT.
-- **Cloud Storage**: Cloudinary (for resumes and images).
+- **Frontend**: React 18, Vite, Tailwind CSS, Clerk (Auth), Socket.io Client.
+- **Backend**: Node.js, Express, Mongoose, Socket.io, Morgan (Logging), Helmet (Security).
+- **Services**: Google Gemini AI (NLP), Cloudinary (Asset Mgmt), Upstash (Redis).
+- **DevOps**: Docker, Docker-Compose, Jest + Supertest (Testing).
 
-## 🚀 Getting Started
+---
+
+## 🚦 Getting Started
 
 ### Prerequisites
-
 - Node.js (v18+)
-- MongoDB Atlas account
-- Clerk account
-- Cloudinary account
-- Google Gemini API Key
+- MongoDB Atlas Account
+- Clerk API Keys
+- Gemini AI API Key
+- Cloudinary Account
+- Upstash Redis URL
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository**
    ```bash
    git clone https://github.com/SriHarshaRajuY/SkillNest.git
    cd SkillNest
    ```
 
-2. Install dependencies:
+2. **Configure Environment Variables**
+   Create a `.env` file in the `server/` directory:
+   ```env
+   MONGODB_URI=your_mongodb_uri
+   JWT_SECRET=your_secret
+   CLOUDINARY_NAME=...
+   GEMINI_API_KEY=...
+   REDIS_URL=...
+   ```
+
+3. **Install Dependencies**
    ```bash
-   # Install server deps
+   # Root level
+   npm run setup # If setup script is configured, or:
    cd server && npm install
-   
-   # Install client deps
    cd ../client && npm install
    ```
 
-3. Setup environment variables:
-   Create a `.env` file in both `server/` and `client/` directories based on the `.env.example` (to be created).
-
-4. Start the application:
+4. **Run Locally**
    ```bash
-   # Start server
-   cd server && npm run dev
-   
-   # Start client
-   cd client && npm run dev
+   # Server (Port 5000)
+   cd server
+   npm run dev
+
+   # Client (Port 5173)
+   cd client
+   npm run dev
    ```
-
-## 🧪 Testing
-
-```bash
-# Run server tests
-cd server && npm test
-
-# Run client tests
-cd client && npm run test
-```
-
-## 📐 Architecture
-
-SkillNest follows a modular architecture:
-- **Controllers**: Handle request logic.
-- **Services**: Business logic and external integrations (AI, Matching).
-- **Models**: Database schemas.
-- **Realtime**: WebSocket event handling.
 
 ---
 
-Built with ❤️ for a production-ready recruitment experience.
+## 🐳 Docker Deployment
+
+SkillNest is container-ready. Launch the entire ecosystem (Client, Server) with a single command:
+
+```bash
+docker-compose up --build
+```
+
+---
+
+## 🧪 Testing & Documentation
+
+### API Documentation
+SkillNest uses **Swagger** for interactive API documentation.
+- **URL**: `http://localhost:5000/api-docs`
+
+### Running Tests
+Our suite uses **Jest** and **Supertest** for isolated integration testing.
+```bash
+cd server
+npm test
+```
+
+---
+
+## 🛡 Ethics & Responsibility
+
+We believe in **Human-in-the-loop AI**.
+- **Transparency**: Every AI-driven score is presented as a "Fit Indicator," not a final decision.
+- **Bias Mitigation**: Our DEI Audit tool actively identifies gendered or ageist language in job posts.
+- **Data Privacy**: We follow GDPR principles for data minimization and secure document handling.
+
+---
+
+## 📄 License
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+*Built with ❤️ by the SkillNest Team.*
