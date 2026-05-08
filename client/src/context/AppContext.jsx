@@ -3,6 +3,7 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { useAuth, useUser } from '@clerk/clerk-react'
 
+/* eslint-disable-next-line react-refresh/only-export-components */
 export const AppContext = createContext()
 
 export const AppContextProvider = ({ children }) => {

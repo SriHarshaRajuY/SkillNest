@@ -139,34 +139,67 @@ export const postJob = async (req, res) => {
     }
 }
 
-// ─── Get applicants for this company's jobs ───────────────────────────────────
+// ─── Get applicants for this company's jobs (Paginated) ───────────────────────
 export const getCompanyJobApplicants = async (req, res) => {
     try {
         const companyId = req.company._id
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const skip = (page - 1) * limit
+
+        const totalResults = await JobApplication.countDocuments({ companyId })
         const applications = await JobApplication.find({ companyId })
             .populate('userId', 'name image resume')
             .populate('jobId', 'title location category level salary')
             .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
 
-        res.json({ success: true, applications })
+        res.json({ 
+            success: true, 
+            applications,
+            pagination: {
+                totalResults,
+                totalPages: Math.ceil(totalResults / limit),
+                currentPage: page,
+                limit
+            }
+        })
     } catch (error) {
         console.error('[getCompanyJobApplicants]', error.message)
         res.status(500).json({ success: false, message: 'Failed to load applicants' })
     }
 }
 
-// ─── Get all jobs posted by this company ─────────────────────────────────────
+// ─── Get all jobs posted by this company (Paginated) ─────────────────────────
 export const getCompanyPostedJobs = async (req, res) => {
     try {
         const companyId = req.company._id
-        const jobs = await Job.find({ companyId }).sort({ date: -1 })
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const skip = (page - 1) * limit
+
+        const totalResults = await Job.countDocuments({ companyId })
+        const jobs = await Job.find({ companyId })
+            .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
 
         const jobsData = await Promise.all(jobs.map(async (job) => {
             const count = await JobApplication.countDocuments({ jobId: job._id })
             return { ...job.toObject(), applicants: count }
         }))
 
-        res.json({ success: true, jobsData })
+        res.json({ 
+            success: true, 
+            jobsData,
+            pagination: {
+                totalResults,
+                totalPages: Math.ceil(totalResults / limit),
+                currentPage: page,
+                limit
+            }
+        })
     } catch (error) {
         console.error('[getCompanyPostedJobs]', error.message)
         res.status(500).json({ success: false, message: 'Failed to load jobs' })
@@ -311,7 +344,13 @@ export const matchResume = asyncHandler(async (req, res) => {
 
     // Check cache first
     const cacheKey = `match:${applicationId}`;
-    const cached = await cacheGet(cacheKey);
+    let cached;
+    try {
+        cached = await cacheGet(cacheKey);
+    } catch (err) {
+        console.warn('[matchResume] Redis error:', err.message);
+    }
+    
     if (cached) {
         return res.json({ success: true, ...cached, cached: true });
     }
@@ -325,31 +364,51 @@ export const matchResume = asyncHandler(async (req, res) => {
     }
 
     if (application.jobId.companyId.toString() !== companyId.toString()) {
-        return res.status(403).json({ success: false, message: 'Not authorized' });
+        return res.status(403).json({ success: false, message: 'Not authorized to analyze this application' });
     }
 
     if (!application.userId?.resume) {
-        return res.status(400).json({ success: false, message: 'No resume uploaded by user' });
+        return res.status(400).json({ success: false, message: 'No resume found for this applicant.' });
     }
 
     // Fetch resume PDF from Cloudinary using a signed URL
     const signedUrl = getSignedResumeUrl(application.userId.resume);
-    const response = await fetch(signedUrl);
-    if (!response.ok) throw new Error('Failed to fetch resume securely. Status: ' + response.status);
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    if (!signedUrl) {
+        return res.status(500).json({ success: false, message: 'Could not generate a secure link to the resume.' });
+    }
+
+    let buffer;
+    try {
+        const response = await fetch(signedUrl);
+        if (!response.ok) {
+            throw new Error(`Cloudinary responded with ${response.status}: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
+    } catch (error) {
+        console.error('[matchResume] Fetch Error:', error.message);
+        return res.status(502).json({ success: false, message: 'Failed to retrieve the resume file from storage.' });
+    }
     
     // Process with AI Service
-    const resumeText = await aiService.parsePDF(buffer);
-    const jobDescription = application.jobId.description;
-    
-    const result = await aiService.generateMatchScore(resumeText, jobDescription);
+    try {
+        const resumeText = await aiService.parsePDF(buffer);
+        const jobDescription = application.jobId.description;
+        
+        const result = await aiService.generateMatchScore(resumeText, jobDescription);
 
-    // Store in cache for 24 hours
-    await cacheSet(cacheKey, { score: result.score, reason: result.reason });
+        // Store in cache for 24 hours
+        try {
+            await cacheSet(cacheKey, { score: result.score, reason: result.reason });
+        } catch (err) {
+            console.warn('[matchResume] Could not set cache:', err.message);
+        }
 
-    res.json({ success: true, score: result.score, reason: result.reason });
+        res.json({ success: true, score: result.score, reason: result.reason });
+    } catch (error) {
+        console.error('[matchResume] AI Processing Error:', error.message);
+        res.status(500).json({ success: false, message: error.message || 'AI analysis failed.' });
+    }
 })
 
 // ─── AI Diversity Audit ───────────────────────────────────────────────────────

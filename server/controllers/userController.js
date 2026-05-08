@@ -48,6 +48,10 @@ const getOrCreateUser = async (userId) => {
  * Generate a time-limited signed URL for a Cloudinary-hosted PDF (raw resource).
  * Uses private_download_url which is the correct API for raw resource type.
  */
+/**
+ * Generate a time-limited signed URL for a Cloudinary-hosted PDF (raw resource).
+ * Uses private_download_url which is the correct API for raw resource type.
+ */
 export const getSignedResumeUrl = (resumeUrl) => {
     if (!resumeUrl) return null
     if (!resumeUrl.includes('cloudinary.com')) return resumeUrl
@@ -57,22 +61,19 @@ export const getSignedResumeUrl = (resumeUrl) => {
 
     const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour
 
-    if (asset.resourceType === 'raw') {
-        // Since we migrated assets to private, or for new private uploads, private_download_url works.
-        // The publicId already includes the extension.
-        return cloudinary.utils.private_download_url(asset.publicId, '', {
-            resource_type: 'raw',
-            expires_at: expiresAt,
-            attachment: false,
-        })
-    }
-
-    // For image resources, private_download_url also works if they are private.
-    return cloudinary.utils.private_download_url(asset.publicId, asset.extension || 'pdf', {
+    // Note: We use type: 'private' because assets are uploaded with that type in updateUserResume
+    const options = {
         resource_type: asset.resourceType,
+        type: 'private', 
         expires_at: expiresAt,
         attachment: false,
-    })
+    }
+
+    if (asset.resourceType === 'raw') {
+        return cloudinary.utils.private_download_url(asset.publicId, '', options)
+    }
+
+    return cloudinary.utils.private_download_url(asset.publicId, asset.extension || 'pdf', options)
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -144,18 +145,34 @@ export const applyForJob = async (req, res) => {
     }
 }
 
-// GET /api/users/applications
+// GET /api/users/applications (Paginated)
 export const getUserJobApplications = async (req, res) => {
     try {
         const userId = getUserId(req)
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const skip = (page - 1) * limit
+
+        const totalResults = await JobApplication.countDocuments({ userId })
         const applications = await JobApplication.find({ userId })
             .select('-internalNotes')
             .populate('companyId', 'name email image')
             .populate('jobId', 'title description location category level salary')
             .sort({ date: -1 })
+            .skip(skip)
+            .limit(limit)
 
         const valid = applications.filter(app => app.jobId && app.companyId)
-        res.json({ success: true, applications: valid })
+        res.json({ 
+            success: true, 
+            applications: valid,
+            pagination: {
+                totalResults,
+                totalPages: Math.ceil(totalResults / limit),
+                currentPage: page,
+                limit
+            }
+        })
     } catch (error) {
         console.error('[getUserJobApplications]', error.message)
         res.status(500).json({ success: false, message: 'Failed to load applications' })

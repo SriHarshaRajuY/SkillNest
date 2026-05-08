@@ -144,6 +144,17 @@ SkillNest uses **Swagger (OpenAPI 3.0)** to provide interactive, professional do
 - **Distributed Caching**: Upstash Redis integration for reducing LLM latency and cloud costs.
 - **Secure File Handling**: Cloudinary Signed URLs for time-limited, private resume viewing.
 
+> [!CAUTION]
+> **Security Alert**: If you have accidentally committed `.env` files or secrets to your Git history, rotate your API keys immediately. Use `git filter-repo` or BFG Repo-Cleaner to purge secrets from your history before pushing to a public repository.
+
+---
+
+## 🤖 CI/CD Automation
+
+SkillNest is configured with **GitHub Actions** to ensure code quality on every push.
+- **Workflow**: `.github/workflows/main.yml`
+- **Checks**: Linting (ESLint), Testing (Vitest/Jest), and Build verification.
+
 ---
 
 ## 📄 License

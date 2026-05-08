@@ -18,6 +18,7 @@ const mockJob = {
   location: 'San Francisco',
   level: 'Senior',
   salary: 150000,
+  description: 'Learn to build scalable applications using the MERN stack.',
   companyId: {
     name: 'TechCorp',
     image: 'logo.png'
@@ -45,10 +46,9 @@ describe('JobCard Component', () => {
       </BrowserRouter>
     )
 
-    const applyBtn = screen.getByText('Apply Now')
+    const applyBtn = screen.getByText('Apply now')
     expect(applyBtn).toBeInTheDocument()
     
-    // Smooth scroll check or just existence
     fireEvent.click(applyBtn)
     expect(window.location.pathname).toBe('/apply-job/123')
   })
