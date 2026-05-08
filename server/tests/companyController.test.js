@@ -17,6 +17,12 @@ jest.unstable_mockModule('../utils/redisClient.js', () => ({
   cacheSet: jest.fn()
 }))
 
+// Mock Clerk to avoid "Publishable key not valid" error in CI
+jest.unstable_mockModule('@clerk/express', () => ({
+  clerkMiddleware: jest.fn(() => (req, res, next) => next()),
+  getAuth: jest.fn(() => ({ userId: 'test_user_id' }))
+}))
+
 const { app } = await import('../server.js')
 
 beforeAll(async () => {

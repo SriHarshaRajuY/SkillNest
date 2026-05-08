@@ -9,6 +9,16 @@ on:
 jobs:
   server-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7.0
+        ports:
+          - 6379:6379
     defaults:
       run:
         working-directory: ./server
@@ -25,8 +35,15 @@ jobs:
       - name: Run Tests
         run: npm test
         env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          MONGODB_URI: "mongodb://localhost:27017/test"
+          JWT_SECRET: "test_secret_key_for_ci"
+          MONGODB_URI: "mongodb://localhost:27017"
+          REDIS_URL: "redis://localhost:6379"
+          CLOUDINARY_NAME: "test"
+          CLOUDINARY_API_KEY: "test"
+          CLOUDINARY_API_SECRET: "test"
+          GEMINI_API_KEY: "test"
+          CLERK_PUBLISHABLE_KEY: "pk_test_123"
+          CLERK_SECRET_KEY: "sk_test_123"
 
   client-tests:
     runs-on: ubuntu-latest
