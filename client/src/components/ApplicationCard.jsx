@@ -1,3 +1,4 @@
+import { assets } from '../assets/assets'
 import { Link } from 'react-router-dom'
 
 const ApplicationCard = ({
@@ -26,7 +27,8 @@ const ApplicationCard = ({
             <div className='flex items-start gap-3'>
                 <img 
                     className='w-10 h-10 rounded-full object-cover border border-gray-100' 
-                    src={applicant.userId.image} 
+                    src={applicant.userId.image || assets.profile_img}
+                    onError={(e) => { e.currentTarget.src = assets.profile_img }}
                     alt={applicant.userId.name} 
                 />
                 <div className='flex-1 min-w-0'>
@@ -61,7 +63,7 @@ const ApplicationCard = ({
                             </button>
                         ) : matchResults[applicant._id].loading ? (
                             <span className='text-[10px] text-gray-500'>Analyzing…</span>
-                        ) : matchResults[applicant._id].score ? (
+                        ) : typeof matchResults[applicant._id].score === 'number' ? (
                             <span className={`text-xs font-bold px-2 py-1 rounded-md border ${matchResults[applicant._id].score >= 80 ? 'bg-green-50 text-green-700 border-green-200' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                 {matchResults[applicant._id].score}%
                             </span>

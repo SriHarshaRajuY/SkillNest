@@ -2,7 +2,7 @@ import Message from '../models/Message.js'
 import JobApplication from '../models/JobApplication.js'
 import Company from '../models/Company.js'
 import aiService from '../services/aiService.js'
-import { getSignedResumeUrl } from './userController.js'
+import { fetchResumeBuffer } from './userController.js'
 import { emitToApplication } from '../realtime/socketHub.js'
 
 const userIdFromReq = (req) => req.auth?.userId
@@ -18,7 +18,7 @@ async function loadApplicationForUser(userId, applicationId) {
 async function loadApplicationForCompany(companyId, applicationId) {
     const app = await JobApplication.findById(applicationId)
         .populate('jobId', 'title description')
-        .populate('userId', 'name email resume image')
+        .populate('userId', 'name email resume resumeAsset image')
     if (!app || app.companyId.toString() !== companyId.toString()) return null
     return app
 }
@@ -291,13 +291,9 @@ export const aiInterviewDraft = async (req, res) => {
         let resumeSnippet = ''
         if (application.userId?.resume) {
             try {
-                const signedUrl = getSignedResumeUrl(application.userId.resume)
-                const response = await fetch(signedUrl)
-                if (response.ok) {
-                    const buf = Buffer.from(await response.arrayBuffer())
-                    const full = await aiService.parsePDF(buf)
-                    resumeSnippet = full.slice(0, 6000)
-                }
+                const { buffer } = await fetchResumeBuffer(application.userId, { timeoutMs: 8000 })
+                const full = await aiService.parsePDF(buffer)
+                resumeSnippet = full.slice(0, 6000)
             } catch {
                 resumeSnippet = ''
             }

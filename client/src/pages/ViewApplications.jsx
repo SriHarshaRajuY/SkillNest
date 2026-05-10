@@ -1,10 +1,8 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { assets } from '../assets/assets'
 import { AppContext } from '../context/AppContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import Loading from '../components/Loading'
-import { PIPELINE_STAGES } from '../constants/pipeline'
 import { useSkillNestSocket } from '../hooks/useSkillNestSocket'
 
 // New modular components
@@ -67,12 +65,12 @@ const ViewApplications = () => {
                 { headers: { token: companyToken } },
             )
             if (data.success) {
-                setApplicants(data.applications.reverse())
+                setApplicants(data.applications)
             } else {
                 toast.error(data.message)
             }
         } catch (error) {
-            toast.error(error.message)
+            toast.error(error.response?.data?.message || error.message)
         }
     }
 
@@ -93,7 +91,7 @@ const ViewApplications = () => {
                 toast.error(data.message)
             }
         } catch (error) {
-            toast.error(error.message)
+            toast.error(error.response?.data?.message || error.message)
         }
     }
 
@@ -123,7 +121,7 @@ const ViewApplications = () => {
                 toast.error(data.message)
             }
         } catch (error) {
-            toast.error(error.message)
+            toast.error(error.response?.data?.message || error.message)
         } finally {
             setSavingNote(false)
         }
@@ -162,9 +160,10 @@ const ViewApplications = () => {
                 setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: data.message } }))
                 toast.error(data.message)
             }
-        } catch {
-            setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: 'Failed to fetch match' } }))
-            toast.error('Failed to perform AI Match')
+        } catch (error) {
+            const message = error.response?.data?.message || 'Failed to perform AI Match'
+            setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: message } }))
+            toast.error(message)
         }
     }
 

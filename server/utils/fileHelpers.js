@@ -22,29 +22,54 @@ export const removeLocalFile = (filePath) => {
  */
 export const extractCloudinaryAsset = (url) => {
     if (!url || !url.includes('cloudinary.com')) return null
+    try {
+        const parsed = new URL(url)
+        const pathSegments = parsed.pathname.split('/').filter(Boolean)
 
-    // Detect resource type from the URL path
-    const resourceType = url.includes('/raw/upload/') ? 'raw'
-        : url.includes('/video/upload/') ? 'video'
-            : 'image'
+        const resourceType = pathSegments.includes('raw')
+            ? 'raw'
+            : pathSegments.includes('video')
+                ? 'video'
+                : 'image'
 
-    const uploadIndex = url.indexOf('/upload/')
-    if (uploadIndex === -1) return null
+        const queryPublicId = parsed.searchParams.get('public_id')
+        if (queryPublicId) {
+            const decodedPublicId = decodeURIComponent(queryPublicId)
+            const extensionMatch = decodedPublicId.match(/\.([^.]+)$/)
+            return {
+                publicId: decodedPublicId,
+                resourceType,
+                deliveryType: 'private',
+                extension: extensionMatch ? extensionMatch[1].toLowerCase() : '',
+            }
+        }
 
-    let afterUpload = url.substring(uploadIndex + 8)
+        const deliveryIndex = pathSegments.findIndex((segment) =>
+            ['upload', 'private', 'authenticated'].includes(segment),
+        )
+        if (deliveryIndex === -1) return null
 
-    // Strip optional version prefix (e.g. v1234567890/)
-    afterUpload = afterUpload.replace(/^v\d+\//, '')
+        const deliveryType = pathSegments[deliveryIndex]
+        let remainingSegments = pathSegments.slice(deliveryIndex + 1)
 
-    // Extract extension
-    const extMatch = afterUpload.match(/\.([^.]+)$/)
-    const extension = extMatch ? extMatch[1].toLowerCase() : ''
-    
-    // For raw files: keep the extension (e.g. resume.pdf)
-    // For images: strip the extension (Cloudinary public_id has no extension)
-    const publicId = resourceType === 'raw'
-        ? afterUpload
-        : afterUpload.replace(/\.[^.]+$/, '')
+        // Cloudinary private/authenticated URLs can contain a signed delivery segment
+        // like "s--abc123--" before the version/public_id path. That segment is not
+        // part of the asset public_id and must be discarded.
+        if (remainingSegments[0] && /^s--[^/]+--$/.test(remainingSegments[0])) {
+            remainingSegments = remainingSegments.slice(1)
+        }
 
-    return { publicId, resourceType, extension }
+        let afterDelivery = remainingSegments.join('/')
+        afterDelivery = decodeURIComponent(afterDelivery).replace(/^v\d+\//, '')
+
+        const extMatch = afterDelivery.match(/\.([^.]+)$/)
+        const extension = extMatch ? extMatch[1].toLowerCase() : ''
+        const publicId = resourceType === 'raw'
+            ? afterDelivery
+            : afterDelivery.replace(/\.[^.]+$/, '')
+
+        return { publicId, resourceType, deliveryType, extension }
+    } catch {
+        return null
+    }
 }

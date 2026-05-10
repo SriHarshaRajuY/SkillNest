@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import MessageChatPanel from '../components/MessageChatPanel'
 import { AppContext } from '../context/AppContext'
+import { assets } from '../assets/assets'
 const CandidateMessages = () => {
     const { applicationId } = useParams()
     const navigate = useNavigate()
@@ -114,7 +115,8 @@ const CandidateMessages = () => {
                                     >
                                         {t.companyImage ? (
                                             <img
-                                                src={t.companyImage}
+                                                src={t.companyImage || assets.company_icon}
+                                                onError={(e) => { e.currentTarget.src = assets.company_icon }}
                                                 alt=''
                                                 className='w-10 h-10 rounded-full object-cover shrink-0'
                                             />

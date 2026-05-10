@@ -6,11 +6,19 @@ const assessmentResultSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now }
 }, { _id: false })
 
+const resumeAssetSchema = new mongoose.Schema({
+    publicId: { type: String, trim: true },
+    resourceType: { type: String, enum: ['image', 'raw', 'video'], default: 'raw' },
+    deliveryType: { type: String, enum: ['upload', 'private', 'authenticated'], default: 'private' },
+    extension: { type: String, trim: true, lowercase: true, default: 'pdf' },
+}, { _id: false })
+
 const userSchema = new mongoose.Schema({
     _id: { type: String, required: true },
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     resume: { type: String, default: '' },
+    resumeAsset: { type: resumeAssetSchema, default: null },
     image: { type: String, default: '' },
     
     // New Fields for upgraded capabilities

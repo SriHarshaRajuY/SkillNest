@@ -1,24 +1,43 @@
 import { createClient } from 'redis'
 
-let redisClient = null
+let redisClient = null;
+let redisInitFailed = false;
 
 export const getRedisClient = async () => {
-    if (redisClient) return redisClient
+    if (redisClient) return redisClient;
+    if (redisInitFailed) return null;
 
     const client = createClient({
-        url: process.env.REDIS_URL || 'redis://localhost:6379'
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        socket: {
+            reconnectStrategy: (retries) => {
+                if (retries > 3) {
+                    console.warn('⚠️ Redis reconnection limit reached.');
+                    return new Error('Retry attempts exhausted');
+                }
+                return Math.min(retries * 100, 3000);
+            }
+        }
     })
 
-    client.on('error', (err) => console.error('Redis Client Error', err))
+    client.on('error', (err) => {
+    // Silently ignore expected socket closure errors from Redis client
+    if (err.name === 'SocketClosedUnexpectedlyError' || (err.message && err.message.includes('SocketClosedUnexpectedlyError')) ) return;
+    console.error('Redis Client Error', err);
+});
 
     try {
-        await client.connect()
-        console.log('🚀 Redis connected')
-        redisClient = client
-        return redisClient
+        if (client) {
+            await client.connect();
+            console.log('🚀 Redis connected');
+            redisClient = client;
+            return redisClient;
+        }
+        return null;
     } catch (err) {
-        console.warn('⚠️ Redis connection failed. Caching will be disabled.', err.message)
-        return null
+        console.warn('⚠️ Redis connection failed. Caching will be disabled.', err.message);
+        redisInitFailed = true;
+        return null;
     }
 }
 

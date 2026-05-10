@@ -36,7 +36,6 @@ const Applications = () => {
         userApplications,
         userDataLoaded,
         fetchUserData,
-        fetchUserApplications,
         setUserApplications,
     } = useContext(AppContext)
 
@@ -108,11 +107,6 @@ const Applications = () => {
         setResume(null)
     }
 
-    useEffect(() => {
-        if (user) {
-            fetchUserApplications()
-        }
-    }, [user])
 
     // ─── Not logged in ───────────────────────────────────────────────────────────
     if (!user) {
@@ -263,7 +257,12 @@ const Applications = () => {
                                         <tr className='hover:bg-gray-50 transition-colors'>
                                             <td className='py-3 px-4 align-middle border-b'>
                                                 <div className='flex items-center gap-2'>
-                                                    <img className='w-8 h-8 rounded-full object-cover' src={job.companyId.image} alt={job.companyId.name} />
+                                                    <img
+                                                        className='w-8 h-8 rounded-full object-cover'
+                                                        src={job.companyId.image || assets.company_icon}
+                                                        onError={(e) => { e.currentTarget.src = assets.company_icon }}
+                                                        alt={job.companyId.name}
+                                                    />
                                                     <span className='font-medium'>{job.companyId.name}</span>
                                                 </div>
                                             </td>

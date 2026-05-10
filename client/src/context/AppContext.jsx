@@ -123,12 +123,11 @@ export const AppContextProvider = ({ children }) => {
     useEffect(() => {
         if (user) {
             setUserDataLoaded(false)
-            fetchUserData()
-            fetchUserApplications()
+            void Promise.all([fetchUserData(), fetchUserApplications()])
         } else {
             setUserData(null)
             setUserApplications([])
-            setUserDataLoaded(false)
+            setUserDataLoaded(true)
         }
     }, [user])
 

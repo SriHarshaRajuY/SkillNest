@@ -155,11 +155,11 @@ export default function MessageChatPanel({
                         No messages yet. Say hello — conversation stays inside SkillNest.
                     </p>
                 )}
-                {messages.map((m) => {
+                {messages.map((m, index) => {
                     const isMine = draftRole === 'user' ? m.fromUser : !m.fromUser
                     return (
                     <div
-                        key={m._id}
+                        key={m._id || `${m.createdAt || 'msg'}-${index}`}
                         className={`flex max-w-[88%] md:max-w-[75%] ${isMine ? 'justify-end ml-auto' : 'justify-start'}`}
                     >
                         <div className={`px-4 py-2.5 text-sm leading-relaxed ${bubbleClass(isMine)}`}>

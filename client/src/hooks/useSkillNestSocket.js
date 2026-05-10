@@ -17,7 +17,6 @@ export function useSkillNestSocket({ backendUrl, authToken, applicationIds = [],
 
         const socket = io(backendUrl, {
             auth: { token: authToken },
-            transports: ['websocket'],
             reconnectionAttempts: 8,
             reconnectionDelay: 800,
         })
@@ -40,7 +39,7 @@ export function useSkillNestSocket({ backendUrl, authToken, applicationIds = [],
                 if (typeof fn === 'function') socket.off(event, fn)
             })
             socket.off('connect', onConnect)
-            if (socket) socket.disconnect()
+            socket.close()
             socketRef.current = null
         }
     }, [backendUrl, authToken, joinRooms, JSON.stringify(applicationIds)])

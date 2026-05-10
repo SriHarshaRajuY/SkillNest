@@ -1,3 +1,4 @@
+import { assets } from '../assets/assets'
 import { Link } from 'react-router-dom'
 import { PIPELINE_STAGES, PIPELINE_LABELS } from '../constants/pipeline'
 
@@ -35,7 +36,12 @@ const ApplicationsTable = ({
                             <td className='py-3 px-4 border-b text-center'>{index + 1}</td>
                             <td className='py-3 px-4 border-b'>
                                 <div className='flex items-center gap-2'>
-                                    <img className='w-9 h-9 rounded-full object-cover max-sm:hidden' src={applicant.userId.image} alt='' />
+                                    <img
+                                        className='w-9 h-9 rounded-full object-cover max-sm:hidden'
+                                        src={applicant.userId.image || assets.profile_img}
+                                        onError={(e) => { e.currentTarget.src = assets.profile_img }}
+                                        alt=''
+                                    />
                                     <span className='font-medium'>{applicant.userId.name}</span>
                                 </div>
                             </td>
@@ -64,7 +70,7 @@ const ApplicationsTable = ({
                                     </button>
                                 ) : matchResults[applicant._id].loading ? (
                                     <span className='text-xs text-gray-400'>…</span>
-                                ) : matchResults[applicant._id].score ? (
+                                ) : typeof matchResults[applicant._id].score === 'number' ? (
                                     <span className='text-xs font-bold text-indigo-700'>{matchResults[applicant._id].score}%</span>
                                 ) : (
                                     <span className='text-xs text-red-500'>Err</span>

@@ -111,7 +111,12 @@ const ApplyJob = () => {
         <div className='bg-white text-black rounded-lg w-ful'>
           <div className='flex justify-center md:justify-between flex-wrap gap-8 px-14 py-20  mb-6 bg-sky-50 border border-sky-400 rounded-xl'>
             <div className='flex flex-col md:flex-row items-center'>
-              <img className='h-24 bg-white rounded-lg p-4 mr-4 max-md:mb-4 border' src={JobData.companyId.image} alt="" />
+              <img
+                className='h-24 bg-white rounded-lg p-4 mr-4 max-md:mb-4 border'
+                src={JobData.companyId.image || assets.company_icon}
+                onError={(e) => { e.currentTarget.src = assets.company_icon }}
+                alt=""
+              />
               <div className='text-center md:text-left text-neutral-700'>
                 <h1 className='text-2xl sm:text-4xl font-medium'>{JobData.title}</h1>
                 <div className='flex flex-row flex-wrap max-md:justify-center gap-y-2 gap-6 items-center text-gray-600 mt-2'>
@@ -143,7 +148,7 @@ const ApplyJob = () => {
               <div className='mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-left max-md:text-center'>
                 <div className='flex items-center gap-2 text-indigo-800 font-semibold mb-1 justify-end max-md:justify-center'>
                   <span className='text-[10px] bg-indigo-200 px-1.5 py-0.5 rounded uppercase tracking-wider'>AI Assisted</span>
-                  <img src={assets.info_icon} className='w-4 h-4 opacity-70' alt="" />
+                  <span className='w-4 h-4 rounded-full border border-indigo-300 text-[10px] inline-flex items-center justify-center opacity-70'>i</span>
                 </div>
                 <p className='text-[11px] text-indigo-600 leading-tight'>
                   Your application will be analyzed by our ethical AI to help recruiters understand your fit. Final hiring decisions are always made by humans.

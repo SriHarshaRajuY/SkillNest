@@ -12,6 +12,105 @@ import aiService from '../services/aiService.js'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const getUserId = (req) => req.auth?.userId
+const RESUME_LINK_TTL_SECONDS = 3600
+
+const normalizeResumeAsset = (asset) => {
+    if (!asset?.publicId) return null
+    return {
+        publicId: asset.publicId,
+        resourceType: asset.resourceType || 'raw',
+        deliveryType: asset.deliveryType || 'private',
+        extension: asset.extension || 'pdf',
+    }
+}
+
+const getResumeSource = (resumeSource) => {
+    if (!resumeSource) return { resumeUrl: '', resumeAsset: null }
+    if (typeof resumeSource === 'string') return { resumeUrl: resumeSource, resumeAsset: null }
+    return {
+        resumeUrl: resumeSource.resume || '',
+        resumeAsset: normalizeResumeAsset(resumeSource.resumeAsset),
+    }
+}
+
+export const getStoredResumeAsset = (resumeSource) => {
+    const { resumeUrl, resumeAsset } = getResumeSource(resumeSource)
+    return resumeAsset || extractCloudinaryAsset(resumeUrl)
+}
+
+const getAdminResumePublicId = (asset) => {
+    if (!asset?.publicId) return ''
+    if (asset.resourceType === 'raw') {
+        return asset.publicId.includes('.')
+            ? asset.publicId
+            : `${asset.publicId}.${asset.extension || 'pdf'}`
+    }
+    return asset.publicId.replace(/\.[^.]+$/, '')
+}
+
+const getResumeAssetUrl = (asset) => {
+    if (!asset?.publicId) return null
+    if (asset.resourceType === 'image' && asset.deliveryType === 'upload') {
+        return cloudinary.url(asset.publicId.replace(/\.[^.]+$/, ''), {
+            secure: true,
+            resource_type: 'image',
+            type: 'upload',
+            format: asset.extension || undefined,
+        })
+    }
+
+    const publicId = getAdminResumePublicId(asset)
+    const format = asset.resourceType === 'raw' ? '' : (asset.extension || '')
+
+    return cloudinary.utils.private_download_url(publicId, format, {
+        resource_type: asset.resourceType || 'raw',
+        type: asset.deliveryType || 'private',
+        expires_at: Math.floor(Date.now() / 1000) + RESUME_LINK_TTL_SECONDS,
+        attachment: false,
+    })
+}
+
+const verifyCloudinaryResumeAsset = async (resumeSource) => {
+    const asset = getStoredResumeAsset(resumeSource)
+    if (!asset) return false
+    try {
+        await cloudinary.api.resource(getAdminResumePublicId(asset), {
+            resource_type: asset.resourceType,
+            type: asset.deliveryType || 'private',
+        })
+        return true
+    } catch (error) {
+        if (error?.http_code === 404) return false
+        throw error
+    }
+}
+
+const persistResumeMetadataIfMissing = async (userDoc) => {
+    if (!userDoc?.resume || userDoc.resumeAsset?.publicId) return
+    const parsed = extractCloudinaryAsset(userDoc.resume)
+    if (!parsed) return
+    userDoc.resumeAsset = normalizeResumeAsset(parsed)
+    await userDoc.save().catch((error) => {
+        console.warn('[persistResumeMetadataIfMissing]', error.message)
+    })
+}
+
+const buildResumeAssetFromUpload = (upload) => normalizeResumeAsset({
+    publicId: upload.public_id,
+    resourceType: upload.resource_type,
+    deliveryType: upload.type,
+    extension: upload.format || extractCloudinaryAsset(upload.secure_url)?.extension || 'pdf',
+})
+
+const destroyStoredResume = async (resumeSource) => {
+    const asset = getStoredResumeAsset(resumeSource)
+    if (!asset) return
+    await cloudinary.uploader.destroy(getAdminResumePublicId(asset), {
+        resource_type: asset.resourceType,
+        type: asset.deliveryType || 'private',
+        invalidate: true,
+    })
+}
 
 /**
  * Get or auto-create a MongoDB user record for a Clerk userId.
@@ -32,6 +131,7 @@ const getOrCreateUser = async (userId) => {
             name,
             image: clerkUser.imageUrl || '',
             resume: '',
+            resumeAsset: null,
         })
     } catch (err) {
         // Handle race condition: duplicate key means webhook created it first
@@ -44,36 +144,37 @@ const getOrCreateUser = async (userId) => {
     return user
 }
 
-/**
- * Generate a time-limited signed URL for a Cloudinary-hosted PDF (raw resource).
- * Uses private_download_url which is the correct API for raw resource type.
- */
-/**
- * Generate a time-limited signed URL for a Cloudinary-hosted PDF (raw resource).
- * Uses private_download_url which is the correct API for raw resource type.
- */
-export const getSignedResumeUrl = (resumeUrl) => {
+export const getSignedResumeUrl = (resumeSource) => {
+    const { resumeUrl } = getResumeSource(resumeSource)
     if (!resumeUrl) return null
     if (!resumeUrl.includes('cloudinary.com')) return resumeUrl
+    return getResumeAssetUrl(getStoredResumeAsset(resumeSource)) || resumeUrl
+}
 
-    const asset = extractCloudinaryAsset(resumeUrl)
-    if (!asset) return resumeUrl
-
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour
-
-    // Note: We use type: 'private' because assets are uploaded with that type in updateUserResume
-    const options = {
-        resource_type: asset.resourceType,
-        type: 'private', 
-        expires_at: expiresAt,
-        attachment: false,
+export const fetchResumeBuffer = async (resumeSource, { timeoutMs = 10000 } = {}) => {
+    const signedUrl = getSignedResumeUrl(resumeSource)
+    if (!signedUrl) {
+        throw new Error('Could not generate a secure link to the resume.')
     }
 
-    if (asset.resourceType === 'raw') {
-        return cloudinary.utils.private_download_url(asset.publicId, '', options)
-    }
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-    return cloudinary.utils.private_download_url(asset.publicId, asset.extension || 'pdf', options)
+    try {
+        const response = await fetch(signedUrl, { signal: controller.signal })
+        if (!response.ok) {
+            throw new Error(`Cloudinary responded with ${response.status}: ${response.statusText}`)
+        }
+        const arrayBuffer = await response.arrayBuffer()
+        return { url: signedUrl, buffer: Buffer.from(arrayBuffer) }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request to fetch resume timed out.')
+        }
+        throw error
+    } finally {
+        clearTimeout(timeoutId)
+    }
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -102,6 +203,7 @@ export const getUserData = async (req, res) => {
     try {
         const user = await getOrCreateUser(getUserId(req))
         if (!user) return res.status(404).json({ success: false, message: 'User not found' })
+        await persistResumeMetadataIfMissing(user)
         res.json({ success: true, user })
     } catch (error) {
         console.error('[getUserData]', error.message)
@@ -194,13 +296,7 @@ export const updateUserResume = async (req, res) => {
 
         // Delete old resume from Cloudinary if exists
         if (user.resume) {
-            const old = extractCloudinaryAsset(user.resume)
-            if (old) {
-                await cloudinary.uploader.destroy(old.publicId, {
-                    resource_type: old.resourceType,
-                    invalidate: true,
-                }).catch(err => console.warn('[updateUserResume] Could not delete old resume:', err.message))
-            }
+            await destroyStoredResume(user).catch(err => console.warn('[updateUserResume] Could not delete old resume:', err.message))
         }
 
         // Upload new resume — must use resource_type: 'raw' for PDFs
@@ -215,6 +311,7 @@ export const updateUserResume = async (req, res) => {
         })
 
         user.resume = upload.secure_url
+        user.resumeAsset = buildResumeAssetFromUpload(upload)
         await user.save()
 
         res.json({ success: true, message: 'Resume uploaded successfully!' })
@@ -233,7 +330,12 @@ export const getResumeSignedUrl = async (req, res) => {
         if (!user?.resume) {
             return res.status(404).json({ success: false, message: 'No resume found. Please upload a resume first.' })
         }
-        const url = getSignedResumeUrl(user.resume)
+        await persistResumeMetadataIfMissing(user)
+        const exists = await verifyCloudinaryResumeAsset(user)
+        if (!exists) {
+            return res.status(404).json({ success: false, message: 'Resume file could not be found in storage. Please upload it again.' })
+        }
+        const url = getSignedResumeUrl(user)
         res.json({ success: true, url })
     } catch (error) {
         console.error('[getResumeSignedUrl]', error.message)
@@ -248,7 +350,7 @@ export const getApplicantResumeSignedUrl = async (req, res) => {
         const companyId = req.company._id
 
         const application = await JobApplication.findById(applicationId)
-            .populate('userId', 'resume name')
+            .populate('userId', 'resume resumeAsset name')
             .populate('jobId', 'companyId')
 
         if (!application) {
@@ -264,7 +366,12 @@ export const getApplicantResumeSignedUrl = async (req, res) => {
             return res.status(404).json({ success: false, message: 'This applicant has not uploaded a resume' })
         }
 
-        const url = getSignedResumeUrl(application.userId.resume)
+        await persistResumeMetadataIfMissing(application.userId)
+        const exists = await verifyCloudinaryResumeAsset(application.userId)
+        if (!exists) {
+            return res.status(404).json({ success: false, message: 'Resume file could not be found in storage. Please ask the candidate to upload it again.' })
+        }
+        const url = getSignedResumeUrl(application.userId)
         res.json({ success: true, url })
     } catch (error) {
         console.error('[getApplicantResumeSignedUrl]', error.message)
@@ -288,12 +395,8 @@ export const optimizeResume = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Job not found' })
         }
 
-        const signedUrl = getSignedResumeUrl(user.resume)
-        const response = await fetch(signedUrl)
-        if (!response.ok) throw new Error('Failed to fetch resume')
-        
-        const arrayBuffer = await response.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
+        await persistResumeMetadataIfMissing(user)
+        const { buffer } = await fetchResumeBuffer(user)
         const resumeText = await aiService.parsePDF(buffer)
 
         const optimization = await aiService.generateResumeOptimization(resumeText, job.description)

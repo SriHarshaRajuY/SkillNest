@@ -116,6 +116,7 @@ router.post('/post-job', protectCompany, postJob)
  *     security: [{ bearerAuth: [] }]
  */
 router.get('/applicants', protectCompany, getCompanyJobApplicants)
+router.get('/applicant-resume/:applicationId', protectCompany, getApplicantResumeSignedUrl)
 
 /**
  * @swagger
@@ -145,6 +146,21 @@ router.get('/list-jobs', protectCompany, getCompanyPostedJobs)
  *               status: { type: string, enum: [Accepted, Rejected, Shortlisted, Pending] }
  */
 router.post('/change-status', protectCompany, changeJobApplicationStatus)
+
+/**
+ * @swagger
+ * /api/company/applications/{applicationId}/internal-notes:
+ *   post:
+ *     summary: Add an internal note to an application
+ *     tags: [Company]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: applicationId
+ *         required: true
+ *         schema: { type: string }
+ */
+router.post('/applications/:applicationId/internal-notes', protectCompany, addInternalNote)
 
 /**
  * @swagger

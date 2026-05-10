@@ -1,12 +1,13 @@
 import Company from '../models/Company.js'
 import bcrypt from 'bcrypt'
 import { v2 as cloudinary } from 'cloudinary'
+import mongoose from 'mongoose'
 import generateToken from '../utils/generateToken.js'
 import Job from '../models/Job.js'
 import JobApplication, { PIPELINE_STAGES } from '../models/JobApplication.js'
 import { emitToApplication } from '../realtime/socketHub.js'
 import { removeLocalFile } from '../utils/fileHelpers.js'
-import { getSignedResumeUrl } from './userController.js'
+import { fetchResumeBuffer } from './userController.js'
 import aiService from '../services/aiService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
 import { cacheGet, cacheSet } from '../utils/redisClient.js'
@@ -317,14 +318,13 @@ export const changeVisibility = async (req, res) => {
     if (!id) {
         return res.status(400).json({ success: false, message: 'Job ID is required' })
     }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid job ID' })
+    }
 
     try {
-        const job = await Job.findById(id)
+        const job = await Job.findOne({ _id: id, companyId: req.company._id })
         if (!job) return res.status(404).json({ success: false, message: 'Job not found' })
-
-        if (job.companyId.toString() !== req.company._id.toString()) {
-            return res.status(403).json({ success: false, message: 'Not authorized to modify this job' })
-        }
 
         job.visible = !job.visible
         await job.save()
@@ -342,6 +342,10 @@ export const matchResume = asyncHandler(async (req, res) => {
     const { applicationId } = req.params;
     const companyId = req.company._id;
 
+    if (!mongoose.Types.ObjectId.isValid(applicationId)) {
+        return res.status(400).json({ success: false, message: 'Invalid application ID' });
+    }
+
     // Check cache first
     const cacheKey = `match:${applicationId}`;
     let cached;
@@ -355,47 +359,30 @@ export const matchResume = asyncHandler(async (req, res) => {
         return res.json({ success: true, ...cached, cached: true });
     }
 
-    const application = await JobApplication.findById(applicationId)
-        .populate('userId', 'resume')
+    const application = await JobApplication.findOne({ _id: applicationId, companyId })
+        .populate('userId', 'resume resumeAsset')
         .populate('jobId', 'description companyId');
 
     if (!application) {
         return res.status(404).json({ success: false, message: 'Application not found' });
     }
 
-    if (application.jobId.companyId.toString() !== companyId.toString()) {
-        return res.status(403).json({ success: false, message: 'Not authorized to analyze this application' });
+    if (!application.jobId) {
+        return res.status(404).json({ success: false, message: 'The linked job record could not be found.' });
     }
 
     if (!application.userId?.resume) {
         return res.status(400).json({ success: false, message: 'No resume found for this applicant.' });
     }
 
-    // Fetch resume PDF from Cloudinary using a signed URL
-    const signedUrl = getSignedResumeUrl(application.userId.resume);
-    if (!signedUrl) {
-        return res.status(500).json({ success: false, message: 'Could not generate a secure link to the resume.' });
-    }
-
-    let buffer;
     try {
-        const response = await fetch(signedUrl);
-        if (!response.ok) {
-            throw new Error(`Cloudinary responded with ${response.status}: ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        buffer = Buffer.from(arrayBuffer);
-    } catch (error) {
-        console.error('[matchResume] Fetch Error:', error.message);
-        return res.status(502).json({ success: false, message: 'Failed to retrieve the resume file from storage.' });
-    }
-    
-    // Process with AI Service
-    try {
+        const { buffer } = await fetchResumeBuffer(application.userId);
         const resumeText = await aiService.parsePDF(buffer);
         const jobDescription = application.jobId.description;
-        
+
         const result = await aiService.generateMatchScore(resumeText, jobDescription);
+        application.matchScore = result.score;
+        await application.save();
 
         // Store in cache for 24 hours
         try {
@@ -404,9 +391,21 @@ export const matchResume = asyncHandler(async (req, res) => {
             console.warn('[matchResume] Could not set cache:', err.message);
         }
 
-        res.json({ success: true, score: result.score, reason: result.reason });
+        return res.json({ success: true, score: result.score, reason: result.reason });
     } catch (error) {
-        console.error('[matchResume] AI Processing Error:', error.message);
+        console.error('[matchResume]', error.message);
+        if (error.message.includes('timed out')) {
+            return res.status(504).json({ success: false, message: error.message });
+        }
+        if (error.message.includes('Cloudinary responded')) {
+            return res.status(502).json({ success: false, message: 'Failed to fetch resume: ' + error.message });
+        }
+        if (error.message.includes('currently unavailable')) {
+            return res.status(503).json({ success: false, message: error.message });
+        }
+        if (error.message.includes('Unreadable')) {
+            return res.status(400).json({ success: false, message: 'The uploaded resume is unreadable or empty. Please ensure it is a valid text-based PDF.' });
+        }
         res.status(500).json({ success: false, message: error.message || 'AI analysis failed.' });
     }
 })

@@ -5,6 +5,7 @@ import { toast } from 'react-toastify'
 import MessageChatPanel from '../components/MessageChatPanel'
 import { AppContext } from '../context/AppContext'
 import Loading from '../components/Loading'
+import { assets } from '../assets/assets'
 
 const RecruiterMessages = () => {
     const { applicationId } = useParams()
@@ -111,11 +112,12 @@ const RecruiterMessages = () => {
                                     }`}
                                 >
                                     {t.candidateImage ? (
-                                        <img
-                                            src={t.candidateImage}
-                                            alt=''
-                                            className='w-10 h-10 rounded-full object-cover shrink-0'
-                                        />
+                                            <img
+                                                src={t.candidateImage || assets.profile_img}
+                                                onError={(e) => { e.currentTarget.src = assets.profile_img }}
+                                                alt=''
+                                                className='w-10 h-10 rounded-full object-cover shrink-0'
+                                            />
                                     ) : (
                                         <div className='w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 shrink-0' />
                                     )}
