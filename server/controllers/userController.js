@@ -1,13 +1,13 @@
 import jwt from 'jsonwebtoken'
-import Job from '../models/Job.js'
 import JobApplication from '../models/JobApplication.js'
 import User from '../models/User.js'
 import { v2 as cloudinary } from 'cloudinary'
 import { clerkClient } from '@clerk/express'
 import { removeLocalFile, extractCloudinaryAsset } from '../utils/fileHelpers.js'
-import Joi from 'joi'
 import { processApplication } from '../services/applicationService.js'
-import aiService from '../services/aiService.js'
+import asyncHandler from '../middleware/asyncHandler.js'
+import logger from '../utils/logger.js'
+import config from '../config/env.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ const persistResumeMetadataIfMissing = async (userDoc) => {
     if (!parsed) return
     userDoc.resumeAsset = normalizeResumeAsset(parsed)
     await userDoc.save().catch((error) => {
-        console.warn('[persistResumeMetadataIfMissing]', error.message)
+        logger.warn('[persistResumeMetadataIfMissing]', error)
     })
 }
 
@@ -112,15 +112,10 @@ const destroyStoredResume = async (resumeSource) => {
     })
 }
 
-/**
- * Get or auto-create a MongoDB user record for a Clerk userId.
- * Handles webhook race conditions and local dev (no webhooks).
- */
 const getOrCreateUser = async (userId) => {
     let user = await User.findById(userId)
     if (user) return user
 
-    // User not in MongoDB yet — fetch from Clerk and create
     const clerkUser = await clerkClient.users.getUser(userId)
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || 'User'
 
@@ -134,7 +129,6 @@ const getOrCreateUser = async (userId) => {
             resumeAsset: null,
         })
     } catch (err) {
-        // Handle race condition: duplicate key means webhook created it first
         if (err.code === 11000) {
             user = await User.findById(userId)
         } else {
@@ -179,129 +173,118 @@ export const fetchResumeBuffer = async (resumeSource, { timeoutMs = 10000 } = {}
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
-// GET /api/users/realtime-token — short-lived JWT for Socket.io (candidate)
-export const getRealtimeToken = async (req, res) => {
-    try {
-        const userId = getUserId(req)
-        if (!userId) {
-            return res.status(401).json({ success: false, message: 'Unauthorized' })
-        }
-        const token = jwt.sign(
-            { userId, role: 'candidate' },
-            process.env.JWT_SECRET,
-            { expiresIn: '24h' },
-        )
-        res.json({ success: true, token })
-    } catch (error) {
-        console.error('[getRealtimeToken]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to issue realtime token' })
-    }
-}
-
-// GET /api/users/user
-export const getUserData = async (req, res) => {
-    try {
-        const user = await getOrCreateUser(getUserId(req))
-        if (!user) return res.status(404).json({ success: false, message: 'User not found' })
-        await persistResumeMetadataIfMissing(user)
-        res.json({ success: true, user })
-    } catch (error) {
-        console.error('[getUserData]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to load user profile' })
-    }
-}
-
-// POST /api/users/apply
-export const applyForJob = async (req, res) => {
+// @desc    Get short-lived token for real-time messaging
+// @route   GET /api/users/realtime-token
+// @access  Private (User)
+export const getRealtimeToken = asyncHandler(async (req, res) => {
     const userId = getUserId(req)
+    const token = jwt.sign(
+        { userId, role: 'candidate' },
+        config.jwtSecret,
+        { expiresIn: '24h' },
+    )
+    res.json({ 
+        success: true, 
+        message: 'Realtime token issued',
+        data: { token } 
+    })
+})
 
-    // Joi Validation for Input
-    const schema = Joi.object({
-        jobId: Joi.string().required(),
-        assessmentScore: Joi.number().min(0).max(100).optional()
+// @desc    Get user profile data
+// @route   GET /api/users/user
+// @access  Private (User)
+export const getUserData = asyncHandler(async (req, res) => {
+    const user = await getOrCreateUser(getUserId(req))
+    if (!user) {
+        res.status(404)
+        throw new Error('User not found')
+    }
+    await persistResumeMetadataIfMissing(user)
+    res.json({ 
+        success: true, 
+        message: 'User data fetched successfully',
+        data: { user } 
+    })
+})
+
+// @desc    Apply for a job
+// @route   POST /api/users/apply
+// @access  Private (User)
+export const applyForJob = asyncHandler(async (req, res) => {
+    const userId = getUserId(req)
+    const { jobId } = req.body
+
+    await processApplication({
+        userId,
+        jobId
     })
 
-    const { error, value } = schema.validate(req.body)
-    if (error) {
-        return res.status(400).json({ success: false, message: error.details[0].message })
-    }
+    res.status(201).json({ 
+        success: true, 
+        message: 'Application submitted successfully' 
+    })
+})
 
-    try {
-        await processApplication({
-            userId,
-            jobId: value.jobId,
-            assessmentScore: value.assessmentScore
-        })
+// @desc    Get user's job applications
+// @route   GET /api/users/applications
+// @access  Private (User)
+export const getUserJobApplications = asyncHandler(async (req, res) => {
+    const userId = getUserId(req)
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 10)
+    const skip = (page - 1) * limit
 
-        res.status(201).json({ success: true, message: 'Application submitted successfully!' })
-    } catch (err) {
-        // Handle explicit logic errors gracefully
-        if (['User not found', 'Job not found', 'This job is no longer accepting applications', 'Please upload your resume before applying'].includes(err.message)) {
-            return res.status(400).json({ success: false, message: err.message })
-        }
-        if (err.message === 'You have already applied for this job' || err.code === 11000) {
-            return res.status(409).json({ success: false, message: 'You have already applied for this job' })
-        }
-        console.error('[applyForJob]', err.message)
-        res.status(500).json({ success: false, message: 'Failed to submit application' })
-    }
-}
+    const filter = { userId }
+    if (req.query.status) filter.status = req.query.status
 
-// GET /api/users/applications (Paginated)
-export const getUserJobApplications = async (req, res) => {
-    try {
-        const userId = getUserId(req)
-        const page = parseInt(req.query.page) || 1
-        const limit = parseInt(req.query.limit) || 10
-        const skip = (page - 1) * limit
+    const totalResults = await JobApplication.countDocuments(filter)
+    const applications = await JobApplication.find(filter)
+        .select('-internalNotes -pipelineHistory')
+        .populate('companyId', 'name image')
+        .populate('jobId', 'title location category level salary')
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
 
-        const totalResults = await JobApplication.countDocuments({ userId })
-        const applications = await JobApplication.find({ userId })
-            .select('-internalNotes')
-            .populate('companyId', 'name email image')
-            .populate('jobId', 'title description location category level salary')
-            .sort({ date: -1 })
-            .skip(skip)
-            .limit(limit)
-
-        const valid = applications.filter(app => app.jobId && app.companyId)
-        res.json({ 
-            success: true, 
-            applications: valid,
+    res.json({ 
+        success: true, 
+        message: 'Applications fetched successfully',
+        data: {
+            applications,
             pagination: {
                 totalResults,
                 totalPages: Math.ceil(totalResults / limit),
                 currentPage: page,
                 limit
             }
-        })
-    } catch (error) {
-        console.error('[getUserJobApplications]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to load applications' })
-    }
-}
+        }
+    })
+})
 
-// POST /api/users/update-resume
-export const updateUserResume = async (req, res) => {
+// @desc    Update candidate resume
+// @route   POST /api/users/update-resume
+// @access  Private (User)
+export const updateUserResume = asyncHandler(async (req, res) => {
     const userId = getUserId(req)
     const resumeFile = req.file
 
     if (!resumeFile) {
-        return res.status(400).json({ success: false, message: 'No resume file provided. Please select a PDF file.' })
+        res.status(400)
+        throw new Error('No resume file provided')
     }
 
     try {
         const user = await getOrCreateUser(userId)
-        if (!user) return res.status(404).json({ success: false, message: 'User not found' })
-
-        // Delete old resume from Cloudinary if exists
-        if (user.resume) {
-            await destroyStoredResume(user).catch(err => console.warn('[updateUserResume] Could not delete old resume:', err.message))
+        if (!user) {
+            res.status(404)
+            throw new Error('User not found')
         }
 
-        // Upload new resume — must use resource_type: 'raw' for PDFs
-        // We use type: 'private' to ensure Cloudinary's Admin API private_download_url
-        // works securely without triggering Strict Delivery profile blocks.
+        if (user.resume) {
+            await destroyStoredResume(user).catch(err => logger.warn('[updateUserResume] Could not delete old resume', err))
+        }
+
         const upload = await cloudinary.uploader.upload(resumeFile.path, {
             resource_type: 'raw',
             type: 'private',
@@ -314,96 +297,69 @@ export const updateUserResume = async (req, res) => {
         user.resumeAsset = buildResumeAssetFromUpload(upload)
         await user.save()
 
-        res.json({ success: true, message: 'Resume uploaded successfully!' })
-    } catch (error) {
-        console.error('[updateUserResume]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to upload resume' })
+        res.json({ 
+            success: true, 
+            message: 'Resume uploaded successfully',
+            data: { resume: user.resume } 
+        })
     } finally {
         removeLocalFile(resumeFile?.path)
     }
-}
+})
 
-// GET /api/users/resume — returns 1-hour signed URL to view own resume
-export const getResumeSignedUrl = async (req, res) => {
-    try {
-        const user = await User.findById(getUserId(req))
-        if (!user?.resume) {
-            return res.status(404).json({ success: false, message: 'No resume found. Please upload a resume first.' })
-        }
-        await persistResumeMetadataIfMissing(user)
-        const exists = await verifyCloudinaryResumeAsset(user)
-        if (!exists) {
-            return res.status(404).json({ success: false, message: 'Resume file could not be found in storage. Please upload it again.' })
-        }
-        const url = getSignedResumeUrl(user)
-        res.json({ success: true, url })
-    } catch (error) {
-        console.error('[getResumeSignedUrl]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to generate resume link' })
+// @desc    Get signed URL for user's own resume
+// @route   GET /api/users/resume
+// @access  Private (User)
+export const getResumeSignedUrl = asyncHandler(async (req, res) => {
+    const user = await User.findById(getUserId(req)).lean()
+    if (!user?.resume) {
+        res.status(404)
+        throw new Error('No resume found')
     }
-}
-
-// GET /api/company/applicant-resume/:applicationId — recruiter views applicant PDF
-export const getApplicantResumeSignedUrl = async (req, res) => {
-    try {
-        const { applicationId } = req.params
-        const companyId = req.company._id
-
-        const application = await JobApplication.findById(applicationId)
-            .populate('userId', 'resume resumeAsset name')
-            .populate('jobId', 'companyId')
-
-        if (!application) {
-            return res.status(404).json({ success: false, message: 'Application not found' })
-        }
-
-        // Verify recruiter owns the job this application is for
-        if (application.jobId?.companyId?.toString() !== companyId.toString()) {
-            return res.status(403).json({ success: false, message: 'Not authorized to view this resume' })
-        }
-
-        if (!application.userId?.resume) {
-            return res.status(404).json({ success: false, message: 'This applicant has not uploaded a resume' })
-        }
-
-        await persistResumeMetadataIfMissing(application.userId)
-        const exists = await verifyCloudinaryResumeAsset(application.userId)
-        if (!exists) {
-            return res.status(404).json({ success: false, message: 'Resume file could not be found in storage. Please ask the candidate to upload it again.' })
-        }
-        const url = getSignedResumeUrl(application.userId)
-        res.json({ success: true, url })
-    } catch (error) {
-        console.error('[getApplicantResumeSignedUrl]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to generate resume link' })
+    const exists = await verifyCloudinaryResumeAsset(user)
+    if (!exists) {
+        res.status(404)
+        throw new Error('Resume file not found in storage')
     }
-}
+    const url = getSignedResumeUrl(user)
+    res.json({ 
+        success: true, 
+        message: 'Signed URL generated',
+        data: { url } 
+    })
+})
 
-// GET /api/users/optimize-resume/:jobId
-export const optimizeResume = async (req, res) => {
-    try {
-        const userId = getUserId(req)
-        const { jobId } = req.params
+// @desc    Get signed URL for applicant's resume (Recruiter)
+// @route   GET /api/company/applicant-resume/:applicationId
+// @access  Private (Company)
+export const getApplicantResumeSignedUrl = asyncHandler(async (req, res) => {
+    const { applicationId } = req.params
+    const companyId = req.company._id
 
-        const user = await User.findById(userId)
-        const job = await Job.findById(jobId)
+    const application = await JobApplication.findById(applicationId)
+        .populate('userId', 'resume resumeAsset name')
+        .populate('jobId', 'companyId')
+        .lean()
 
-        if (!user?.resume) {
-            return res.status(400).json({ success: false, message: 'Please upload a resume first' })
-        }
-        if (!job) {
-            return res.status(404).json({ success: false, message: 'Job not found' })
-        }
-
-        await persistResumeMetadataIfMissing(user)
-        const { buffer } = await fetchResumeBuffer(user)
-        const resumeText = await aiService.parsePDF(buffer)
-
-        const optimization = await aiService.generateResumeOptimization(resumeText, job.description)
-
-        res.json({ success: true, ...optimization })
-    } catch (error) {
-        console.error('[optimizeResume]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to optimize resume' })
+    if (!application) {
+        res.status(404)
+        throw new Error('Application not found')
     }
-}
+
+    if (application.jobId?.companyId?.toString() !== companyId.toString()) {
+        res.status(403)
+        throw new Error('Not authorized to view this resume')
+    }
+
+    if (!application.userId?.resume) {
+        res.status(404)
+        throw new Error('No resume found for this applicant')
+    }
+
+    const url = getSignedResumeUrl(application.userId)
+    res.json({ 
+        success: true, 
+        message: 'Signed URL generated',
+        data: { url } 
+    })
+})

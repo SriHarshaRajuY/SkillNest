@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { toast } from 'react-toastify'
 import { useSkillNestSocket } from '../hooks/useSkillNestSocket'
+import { messageService } from '../services/messageService'
 
 function bubbleClass(isMine) {
     return isMine
@@ -10,13 +10,11 @@ function bubbleClass(isMine) {
 }
 
 export default function MessageChatPanel({
-    backendUrl,
     applicationId,
-    authHeaders,
+    clerkToken,
     peerLabel,
     peerImage,
-    draftRole,
-    realtimeToken,
+    draftRole, // 'user' or 'company'
     onDraft,
     loadingDraft,
     aiDraftTrigger = 0,
@@ -26,42 +24,47 @@ export default function MessageChatPanel({
     const [meta, setMeta] = useState(null)
     const [text, setText] = useState('')
     const [loading, setLoading] = useState(true)
+    const [isPeerTyping, setIsPeerTyping] = useState(false)
+    const typingTimeoutRef = useRef(null)
     const bottomRef = useRef(null)
 
-    const load = async () => {
+    const isCompany = draftRole === 'company'
+
+    // ─── Data Loading ────────────────────────────────────────────────────────
+    const load = useCallback(async () => {
         if (!applicationId) return
         setLoading(true)
         try {
-            const path =
-                draftRole === 'company'
-                    ? `${backendUrl}/api/company/messages/thread/${applicationId}`
-                    : `${backendUrl}/api/users/messages/thread/${applicationId}`
-            const { data } = await axios.get(path, { headers: authHeaders })
-            if (data.success) {
-                setMessages(data.messages || [])
-                setMeta(data.application || null)
-            } else {
-                toast.error(data.message)
+            const response = isCompany
+                ? await messageService.getRecruiterThreadMessages(applicationId)
+                : await messageService.getUserThreadMessages(applicationId, {}, clerkToken)
+            
+            if (response.success) {
+                setMessages(response.data.messages || [])
+                setMeta(response.data.application || null)
             }
         } catch (e) {
             toast.error(e.message || 'Failed to load chat')
         } finally {
             setLoading(false)
         }
-    }
+    }, [applicationId, isCompany, clerkToken])
 
     useEffect(() => {
         load()
-    }, [applicationId, draftRole])
+    }, [load])
 
     useEffect(() => {
         if (!aiDraftTrigger || !aiDraftBody) return
         setText(aiDraftBody.trim())
     }, [aiDraftTrigger, aiDraftBody])
 
-    useSkillNestSocket({
-        backendUrl,
-        authToken: realtimeToken || null,
+    // ─── Socket Integration ──────────────────────────────────────────────────
+    const socketAuthToken = isCompany ? localStorage.getItem('companyToken') : clerkToken
+
+    const { emit } = useSkillNestSocket({
+        backendUrl: (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, ''),
+        authToken: socketAuthToken,
         applicationIds: applicationId ? [applicationId] : [],
         handlers: {
             'message:new': ({ message }) => {
@@ -70,44 +73,81 @@ export default function MessageChatPanel({
                     if (prev.some((m) => String(m._id) === String(message._id))) return prev
                     return [...prev, message]
                 })
+                setIsPeerTyping(false)
             },
+            'typing:start': (payload) => {
+                if (payload.applicationId === applicationId && payload.role !== draftRole) {
+                    setIsPeerTyping(true)
+                }
+            },
+            'typing:stop': (payload) => {
+                if (payload.applicationId === applicationId && payload.role !== draftRole) {
+                    setIsPeerTyping(false)
+                }
+            }
         },
     })
 
+    // ─── Actions ─────────────────────────────────────────────────────────────
+    const scrollToBottom = (behavior = 'smooth') => {
+        bottomRef.current?.scrollIntoView({ behavior })
+    }
+
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
+        scrollToBottom()
+    }, [messages, isPeerTyping])
+
+    const handleTyping = (e) => {
+        setText(e.target.value)
+        
+        emit('typing:start', { applicationId })
+        
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = setTimeout(() => {
+            emit('typing:stop', { applicationId })
+        }, 2000)
+    }
 
     const send = async () => {
         const body = text.trim()
         if (!body || !applicationId) return
+
+        // 1. Optimistic UI Update
+        const tempId = `temp-${Date.now()}`
+        const optimisticMsg = {
+            _id: tempId,
+            applicationId,
+            body,
+            fromUser: !isCompany,
+            createdAt: new Date().toISOString(),
+            isOptimistic: true
+        }
+
+        setMessages(prev => [...prev, optimisticMsg])
+        setText('')
+        emit('typing:stop', { applicationId })
+
         try {
-            const path =
-                draftRole === 'company'
-                    ? `${backendUrl}/api/company/messages`
-                    : `${backendUrl}/api/users/messages`
-            const { data } = await axios.post(
-                path,
-                { applicationId, body },
-                { headers: authHeaders },
-            )
-            if (data.success) {
-                setText('')
-                setMessages((prev) => {
-                    if (prev.some(m => String(m._id) === String(data.message._id))) return prev
-                    return [...prev, data.message]
-                })
-            } else {
-                toast.error(data.message)
+            const response = isCompany
+                ? await messageService.sendRecruiterMessage({ applicationId, content: body })
+                : await messageService.sendUserMessage({ applicationId, content: body }, clerkToken)
+
+            if (response.success) {
+                // Replace optimistic message with actual one
+                setMessages(prev => prev.map(m => m._id === tempId ? response.data.message : m))
             }
         } catch (e) {
             toast.error(e.message || 'Send failed')
+            // Remove optimistic message on failure
+            setMessages(prev => prev.filter(m => m._id !== tempId))
+            setText(body) // Restore text
         }
     }
 
     if (!applicationId) {
         return (
             <div className='flex flex-col items-center justify-center h-[50vh] text-slate-500 text-sm'>
+                <span className="text-4xl mb-4">💬</span>
                 Select a conversation to view secure messages.
             </div>
         )
@@ -115,14 +155,18 @@ export default function MessageChatPanel({
 
     if (loading) {
         return (
-            <div className='flex justify-center py-20'>
-                <div className='w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin' />
+            <div className='flex flex-col gap-4 p-6'>
+                {[1, 2, 3].map(i => (
+                    <div key={i} className={`flex ${i % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
+                        <div className="w-2/3 h-12 bg-slate-200 rounded-2xl animate-pulse" />
+                    </div>
+                ))}
             </div>
         )
     }
 
     return (
-        <div className='flex flex-col h-[calc(100vh-220px)] min-h-[420px] bg-slate-50/80 rounded-2xl border border-slate-200 overflow-hidden'>
+        <div className='flex flex-col h-[calc(100vh-220px)] min-h-[420px] bg-slate-50/80 rounded-2xl border border-slate-200 overflow-hidden shadow-sm'>
             <header className='flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200'>
                 {peerImage ? (
                     <img src={peerImage} alt='' className='w-11 h-11 rounded-full object-cover ring-2 ring-slate-100' />
@@ -137,76 +181,93 @@ export default function MessageChatPanel({
                         <p className='text-xs text-slate-500 truncate'>Re: {meta.jobTitle}</p>
                     )}
                 </div>
-                {draftRole === 'company' && onDraft && (
+                {isCompany && onDraft && (
                     <button
                         type='button'
                         onClick={onDraft}
                         disabled={loadingDraft}
-                        className='text-xs font-semibold px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm hover:opacity-95 disabled:opacity-50 shrink-0'
+                        className='text-xs font-semibold px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm hover:opacity-95 disabled:opacity-50 shrink-0 transition-all hover:scale-105'
                     >
                         {loadingDraft ? 'Drafting…' : 'AI smart draft'}
                     </button>
                 )}
             </header>
 
-            <div className='flex-1 overflow-y-auto px-3 py-4 space-y-3'>
+            <div className='flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-fixed'>
                 {messages.length === 0 && (
-                    <p className='text-center text-sm text-slate-400 py-8'>
-                        No messages yet. Say hello — conversation stays inside SkillNest.
-                    </p>
-                )}
-                {messages.map((m, index) => {
-                    const isMine = draftRole === 'user' ? m.fromUser : !m.fromUser
-                    return (
-                    <div
-                        key={m._id || `${m.createdAt || 'msg'}-${index}`}
-                        className={`flex max-w-[88%] md:max-w-[75%] ${isMine ? 'justify-end ml-auto' : 'justify-start'}`}
-                    >
-                        <div className={`px-4 py-2.5 text-sm leading-relaxed ${bubbleClass(isMine)}`}>
-                            <p className='whitespace-pre-wrap break-words'>{m.body}</p>
-                            <p
-                                className={`text-[10px] mt-1 opacity-70 ${isMine ? 'text-indigo-100' : 'text-slate-400'}`}
-                            >
-                                {new Date(m.createdAt).toLocaleString(undefined, {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                })}
-                            </p>
-                        </div>
+                    <div className="flex flex-col items-center justify-center py-10 opacity-40">
+                        <span className="text-3xl mb-2">👋</span>
+                        <p className='text-sm text-slate-600'>Start the conversation</p>
                     </div>
+                )}
+                
+                {messages.map((m, index) => {
+                    const isMine = isCompany ? !m.fromUser : m.fromUser
+                    return (
+                        <div
+                            key={m._id || `${m.createdAt || 'msg'}-${index}`}
+                            className={`flex group ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                        >
+                            <div className={`px-4 py-2.5 text-sm leading-relaxed ${bubbleClass(isMine)} ${m.isOptimistic ? 'opacity-60' : ''}`}>
+                                <p className='whitespace-pre-wrap break-words'>{m.body}</p>
+                                <div className="flex items-center justify-end gap-1 mt-1">
+                                    <p className={`text-[10px] opacity-70 ${isMine ? 'text-indigo-100' : 'text-slate-400'}`}>
+                                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    {isMine && !m.isOptimistic && <span className="text-[10px] text-indigo-200">✓</span>}
+                                </div>
+                            </div>
+                        </div>
                     )
                 })}
-                <div ref={bottomRef} />
+                
+                {isPeerTyping && (
+                    <div className="flex justify-start animate-fade-in">
+                        <div className="bg-white border border-slate-200 px-4 py-2.5 rounded-2xl rounded-bl-md shadow-sm">
+                            <div className="flex gap-1">
+                                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                <div ref={bottomRef} className="h-2" />
             </div>
 
-            <footer className='p-3 bg-white border-t border-slate-200'>
+            <footer className='p-4 bg-white border-t border-slate-200'>
                 {meta && !['Screening', 'Interview', 'Offer', 'Hired'].includes(meta.pipelineStage) ? (
-                    <div className='text-center py-2 text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-200'>
-                        Messaging is restricted. Candidate must be shortlisted to enable chat.
+                    <div className='text-center py-3 text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300'>
+                        🔒 Messaging restricted. {isCompany ? 'Shortlist the candidate' : 'Wait for shortlisting'} to enable chat.
                     </div>
                 ) : (
-                    <div className='flex gap-2 items-end'>
-                        <textarea
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            placeholder='Write a secure message…'
-                            rows={2}
-                            className='flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none'
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    send()
-                                }
-                            }}
-                        />
+                    <div className='flex gap-3 items-end'>
+                        <div className="flex-1 relative">
+                            <textarea
+                                value={text}
+                                onChange={handleTyping}
+                                placeholder='Write a secure message…'
+                                rows={1}
+                                className='w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all pr-12 scrollbar-hide'
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        send()
+                                    }
+                                }}
+                                style={{ maxHeight: '120px' }}
+                            />
+                        </div>
                         <button
                             type='button'
                             onClick={send}
-                            className='shrink-0 h-[42px] px-5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors'
+                            disabled={!text.trim()}
+                            className='shrink-0 w-12 h-12 flex items-center justify-center rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:grayscale'
                         >
-                            Send
+                            <svg viewBox="0 0 24 24" className="w-6 h-6 rotate-45" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
                         </button>
                     </div>
                 )}

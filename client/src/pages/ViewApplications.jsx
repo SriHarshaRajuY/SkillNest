@@ -1,11 +1,11 @@
-import { useContext, useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { AppContext } from '../context/AppContext'
-import axios from 'axios'
 import { toast } from 'react-toastify'
 import Loading from '../components/Loading'
 import { useSkillNestSocket } from '../hooks/useSkillNestSocket'
+import { recruiterService } from '../services/recruiterService'
 
-// New modular components
+// Modular components
 import KanbanBoard from '../components/KanbanBoard'
 import ApplicationsTable from '../components/ApplicationsTable'
 import ApplicationDetailsPanel from '../components/ApplicationDetailsPanel'
@@ -18,9 +18,9 @@ function displayPipelineStage(app) {
 }
 
 const ViewApplications = () => {
-    const { backendUrl, companyToken } = useContext(AppContext)
+    const { companyToken, companyLoaded } = useContext(AppContext)
 
-    const [applicants, setApplicants] = useState(false)
+    const [applicants, setApplicants] = useState(null)
     const [viewMode, setViewMode] = useState('table')
     const [matchResults, setMatchResults] = useState({})
     const [selectedId, setSelectedId] = useState(null)
@@ -33,8 +33,9 @@ const ViewApplications = () => {
         [applicants],
     )
 
+    // ─── Socket.io Integration ───────────────────────────────────────────────
     useSkillNestSocket({
-        backendUrl,
+        backendUrl: (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, ''),
         authToken: companyToken || null,
         applicationIds,
         handlers: {
@@ -59,69 +60,58 @@ const ViewApplications = () => {
         },
     })
 
-    const fetchCompanyJobApplications = async () => {
+    // ─── Actions ─────────────────────────────────────────────────────────────
+    const fetchApplicants = useCallback(async () => {
         try {
-            const { data } = await axios.get(backendUrl + '/api/company/applicants',
-                { headers: { token: companyToken } },
-            )
-            if (data.success) {
-                setApplicants(data.applications)
-            } else {
-                toast.error(data.message)
+            const response = await recruiterService.getApplicants()
+            if (response.success) {
+                setApplicants(response.data.applications)
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || error.message)
+            toast.error(error.message || 'Failed to load applicants')
         }
-    }
+    }, [])
 
     const changePipeline = async (id, pipelineStage) => {
         try {
-            const { data } = await axios.post(backendUrl + '/api/company/change-status',
-                { id, pipelineStage },
-                { headers: { token: companyToken } },
-            )
-            if (data.success) {
-                toast.success('Pipeline updated')
+            const response = await recruiterService.updatePipelineStage({ id, pipelineStage })
+            if (response.success) {
+                toast.success(`Candidate moved to ${pipelineStage}`)
                 setApplicants((prev) =>
                     !prev ? prev : prev.map((a) =>
-                        String(a._id) === String(id) ? data.application : a,
+                        String(a._id) === String(id) ? response.data.application : a,
                     ),
                 )
-            } else {
-                toast.error(data.message)
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || error.message)
+            toast.error(error.message || 'Failed to update pipeline')
         }
     }
 
     const submitInternalNote = async () => {
         if (!selectedId || !noteBody.trim()) {
-            toast.error('Enter a note')
+            toast.error('Note content is required')
             return
         }
         setSavingNote(true)
         try {
-            const { data } = await axios.post(
-                `${backendUrl}/api/company/applications/${selectedId}/internal-notes`,
-                { body: noteBody.trim(), rating: noteRating },
-                { headers: { token: companyToken } },
-            )
-            if (data.success) {
-                toast.success('Feedback shared with your team')
+            const response = await recruiterService.addInternalNote(selectedId, {
+                content: noteBody.trim(),
+                rating: noteRating
+            })
+            if (response.success) {
+                toast.success('Internal note shared')
                 setNoteBody('')
                 setApplicants((prev) =>
                     !prev ? prev : prev.map((a) =>
                         String(a._id) === String(selectedId)
-                            ? { ...a, internalNotes: data.internalNotes }
+                            ? { ...a, internalNotes: response.data.internalNotes }
                             : a,
                     ),
                 )
-            } else {
-                toast.error(data.message)
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || error.message)
+            toast.error(error.message || 'Failed to add note')
         } finally {
             setSavingNote(false)
         }
@@ -129,44 +119,34 @@ const ViewApplications = () => {
 
     const viewApplicantResume = async (applicationId) => {
         try {
-            const response = await fetch(
-                `${backendUrl}/api/company/applicant-resume/${applicationId}`,
-                { headers: { token: companyToken } },
-            )
-            const data = await response.json()
-            if (data.success && data.url) {
-                window.open(data.url, '_blank')
-            } else {
-                toast.error(data.message || 'Could not load resume')
+            const response = await recruiterService.getApplicantResume(applicationId)
+            if (response.success && response.data.url) {
+                window.open(response.data.url, '_blank')
             }
-        } catch {
-            toast.error('Failed to open resume')
+        } catch (error) {
+            toast.error(error.message || 'Failed to open resume')
         }
     }
 
     const handleAIMatch = async (applicationId) => {
         setMatchResults(prev => ({ ...prev, [applicationId]: { loading: true } }))
         try {
-            const { data } = await axios.get(`${backendUrl}/api/company/match-resume/${applicationId}`, {
-                headers: { token: companyToken },
-            })
-            if (data.success) {
+            const response = await recruiterService.matchResume(applicationId)
+            if (response.success) {
                 setMatchResults(prev => ({
                     ...prev,
-                    [applicationId]: { loading: false, score: data.score, reason: data.reason },
+                    [applicationId]: { loading: false, score: response.data.score, reason: response.data.reason },
                 }))
-                toast.success('AI Match generated!')
-            } else {
-                setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: data.message } }))
-                toast.error(data.message)
+                toast.success('AI Match generated')
             }
         } catch (error) {
-            const message = error.response?.data?.message || 'Failed to perform AI Match'
+            const message = error.message || 'AI Match failed'
             setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: message } }))
             toast.error(message)
         }
     }
 
+    // ─── Drag & Drop ────────────────────────────────────────────────────────
     const handleDragStart = (e, applicantId) => {
         e.dataTransfer.setData('applicantId', applicantId)
     }
@@ -189,22 +169,26 @@ const ViewApplications = () => {
 
     useEffect(() => {
         if (companyToken) {
-            fetchCompanyJobApplications()
+            fetchApplicants()
         }
-    }, [companyToken])
+    }, [companyToken, fetchApplicants])
 
-    const selectedApplicant = Array.isArray(applicants) && selectedId
-        ? applicants.find((a) => String(a._id) === String(selectedId))
-        : null
+    const selectedApplicant = useMemo(() => 
+        Array.isArray(applicants) && selectedId
+            ? applicants.find((a) => String(a._id) === String(selectedId))
+            : null
+    , [applicants, selectedId])
 
-    if (!applicants) return <Loading />
+    if (!companyLoaded || applicants === null) return <Loading />
 
     if (applicants.length === 0) {
         return (
-            <div className='flex flex-col items-center justify-center h-[70vh] text-center'>
-                <div className='text-5xl mb-4'>📋</div>
-                <p className='text-xl text-gray-600 font-medium'>No Applications Yet</p>
-                <p className='text-sm text-gray-400 mt-2'>Applications from job seekers will appear here</p>
+            <div className='flex flex-col items-center justify-center h-[70vh] text-center animate-fade-in'>
+                <div className='text-6xl mb-6 grayscale'>📋</div>
+                <h3 className='text-xl text-slate-800 font-bold'>No Applications Yet</h3>
+                <p className='text-sm text-slate-400 mt-2 max-w-xs'>
+                    Candidates applying for your roles will appear here. Try posting a new job!
+                </p>
             </div>
         )
     }
@@ -212,45 +196,47 @@ const ViewApplications = () => {
     const validApplicants = applicants.filter(item => item.jobId && item.userId)
 
     return (
-        <div className='container mx-auto p-4'>
-            <div className='flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6'>
+        <div className='max-w-7xl mx-auto animate-fade-in'>
+            <div className='flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8'>
                 <div>
-                    <h1 className='text-2xl font-semibold text-gray-800'>Applications</h1>
-                    <p className='text-sm text-gray-500 mt-1'>
-                        Kanban updates candidates in real time. Team notes stay internal.
+                    <h1 className='text-3xl font-bold text-slate-900 tracking-tight'>Hiring Pipeline</h1>
+                    <p className='text-sm text-slate-500 mt-1 font-medium'>
+                        Manage candidates through their journey from application to hire.
                     </p>
                 </div>
-                <div className='bg-gray-100 p-1 rounded-lg flex gap-1 self-start'>
+                <div className='bg-slate-100 p-1 rounded-2xl flex gap-1 self-start border border-slate-200 shadow-inner'>
                     <button
                         type='button'
                         onClick={() => setViewMode('table')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'table' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
                     >
                         Table
                     </button>
                     <button
                         type='button'
                         onClick={() => setViewMode('kanban')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'kanban' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
                     >
-                        Live pipeline
+                        Kanban
                     </button>
                 </div>
             </div>
 
-            <div className={`flex gap-4 ${viewMode === 'kanban' ? 'flex-col xl:flex-row' : ''}`}>
+            <div className={`flex gap-8 ${viewMode === 'kanban' ? 'flex-col xl:flex-row' : 'flex-col'}`}>
                 <div className='flex-1 min-w-0'>
                     {viewMode === 'table' ? (
-                        <ApplicationsTable
-                            applicants={validApplicants}
-                            selectedId={selectedId}
-                            setSelectedId={setSelectedId}
-                            viewApplicantResume={viewApplicantResume}
-                            handleAIMatch={handleAIMatch}
-                            matchResults={matchResults}
-                            displayPipelineStage={displayPipelineStage}
-                            changePipeline={changePipeline}
-                        />
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                            <ApplicationsTable
+                                applicants={validApplicants}
+                                selectedId={selectedId}
+                                setSelectedId={setSelectedId}
+                                viewApplicantResume={viewApplicantResume}
+                                handleAIMatch={handleAIMatch}
+                                matchResults={matchResults}
+                                displayPipelineStage={displayPipelineStage}
+                                changePipeline={changePipeline}
+                            />
+                        </div>
                     ) : (
                         <KanbanBoard
                             validApplicants={validApplicants}

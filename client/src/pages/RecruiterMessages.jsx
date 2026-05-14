@@ -1,16 +1,16 @@
 import { useContext, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import axios from 'axios'
 import { toast } from 'react-toastify'
 import MessageChatPanel from '../components/MessageChatPanel'
 import { AppContext } from '../context/AppContext'
 import Loading from '../components/Loading'
 import { assets } from '../assets/assets'
+import { messageService } from '../services/messageService'
 
 const RecruiterMessages = () => {
     const { applicationId } = useParams()
     const navigate = useNavigate()
-    const { backendUrl, companyToken } = useContext(AppContext)
+    const { companyToken, companyLoaded } = useContext(AppContext)
 
     const [threads, setThreads] = useState([])
     const [loading, setLoading] = useState(true)
@@ -18,48 +18,46 @@ const RecruiterMessages = () => {
     const [aiDraftTrigger, setAiDraftTrigger] = useState(0)
     const [aiDraftBody, setAiDraftBody] = useState('')
 
-    const headers = companyToken ? { token: companyToken } : null
-
     useEffect(() => {
-        if (!headers) return
+        if (!companyToken) return
         let cancelled = false
         ;(async () => {
             try {
-                const { data } = await axios.get(`${backendUrl}/api/company/messages/threads`, { headers })
-                if (!cancelled && data.success) setThreads(data.threads || [])
-            } catch {
-                if (!cancelled) setThreads([])
+                const response = await messageService.getRecruiterThreads()
+                if (!cancelled && response.success) {
+                    setThreads(response.data.threads || [])
+                }
+            } catch (error) {
+                console.error('[RecruiterMessages] Error loading threads', error)
             } finally {
                 if (!cancelled) setLoading(false)
             }
         })()
         return () => { cancelled = true }
-    }, [backendUrl, companyToken])
+    }, [companyToken])
 
     const active = threads.find((t) => String(t.applicationId) === String(applicationId))
 
     const handleDraft = async () => {
-        if (!applicationId || !headers) return
+        if (!applicationId) return
         setLoadingDraft(true)
         try {
-            const { data } = await axios.post(
-                `${backendUrl}/api/company/messages/ai-draft`,
-                { applicationId },
-                { headers },
-            )
-            if (data.success && data.draft) {
-                setAiDraftBody(data.draft)
+            const response = await messageService.getAIDraft(applicationId)
+            if (response.success && response.data.draft) {
+                setAiDraftBody(response.data.draft)
                 setAiDraftTrigger((k) => k + 1)
-                toast.success('Draft loaded — review and send when ready.')
+                toast.success('Draft generated — review and send.')
             } else {
-                toast.error(data.message || 'Draft failed')
+                toast.error(response.message || 'Draft failed')
             }
-        } catch {
-            toast.error('Could not generate draft')
+        } catch (error) {
+            toast.error(error.message || 'Could not generate draft')
         } finally {
             setLoadingDraft(false)
         }
     }
+
+    if (!companyLoaded) return <Loading />
 
     if (!companyToken) {
         return (
@@ -70,71 +68,74 @@ const RecruiterMessages = () => {
     }
 
     return (
-        <div className='max-w-6xl mx-auto'>
+        <div className='max-w-6xl mx-auto animate-fade-in'>
             <div className='flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8'>
                 <div>
-                    <h1 className='text-2xl font-bold text-slate-900 tracking-tight'>Candidate inbox</h1>
+                    <h1 className='text-3xl font-bold text-slate-900 tracking-tight'>Candidate Inbox</h1>
                     <p className='text-slate-500 text-sm mt-1'>
-                        Secure threads tied to applications — use AI smart draft for interview invites.
+                        Direct communication with shortlisted talent — use AI for professional drafting.
                     </p>
                 </div>
                 <button
                     type='button'
                     onClick={() => navigate('/dashboard/view-applications')}
-                    className='text-sm font-medium text-indigo-600 hover:text-indigo-800 text-left'
+                    className='text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1'
                 >
-                    ← Pipeline board
+                    <span>←</span> Back to pipeline
                 </button>
             </div>
 
             <div className='grid grid-cols-1 lg:grid-cols-5 gap-6'>
-                <aside className='lg:col-span-2 border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden max-h-[520px] lg:max-h-[calc(100vh-240px)] flex flex-col'>
-                    <div className='px-4 py-3 border-b border-slate-100 bg-slate-50'>
-                        <p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Threads</p>
+                <aside className='lg:col-span-2 border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden h-[500px] lg:h-[600px] flex flex-col'>
+                    <div className='px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center'>
+                        <p className='text-xs font-bold uppercase tracking-widest text-slate-400'>Conversations</p>
+                        <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{threads.length}</span>
                     </div>
-                    <div className='overflow-y-auto flex-1'>
+                    <div className='overflow-y-auto flex-1 scrollbar-hide'>
                         {loading ? (
-                            <div className='p-10 flex justify-center'>
-                                <Loading />
+                            <div className='p-12 flex justify-center'>
+                                <div className='w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin' />
                             </div>
                         ) : threads.length === 0 ? (
-                            <p className='p-6 text-sm text-slate-500'>
-                                No messages yet. Open a candidate thread from the pipeline or start below from an application.
-                            </p>
+                            <div className="p-10 text-center">
+                                <p className='text-sm text-slate-400'>No active threads.</p>
+                                <p className="text-xs text-slate-400 mt-1">Start a conversation from the applications board.</p>
+                            </div>
                         ) : (
                             threads.map((t) => (
                                 <button
                                     key={String(t.applicationId)}
                                     type='button'
                                     onClick={() => navigate(`/dashboard/messages/${t.applicationId}`)}
-                                    className={`w-full text-left px-4 py-3 flex gap-3 border-b border-slate-50 hover:bg-slate-50 transition-colors ${
-                                        String(t.applicationId) === String(applicationId) ? 'bg-indigo-50/80' : ''
+                                    className={`w-full text-left px-5 py-4 flex gap-4 border-b border-slate-50 hover:bg-slate-50 transition-all ${
+                                        String(t.applicationId) === String(applicationId) ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'
                                     }`}
                                 >
-                                    {t.candidateImage ? (
-                                            <img
-                                                src={t.candidateImage || assets.profile_img}
-                                                onError={(e) => { e.currentTarget.src = assets.profile_img }}
-                                                alt=''
-                                                className='w-10 h-10 rounded-full object-cover shrink-0'
-                                            />
-                                    ) : (
-                                        <div className='w-10 h-10 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 shrink-0' />
-                                    )}
+                                    <div className="relative shrink-0">
+                                        <img
+                                            src={t.candidateImage || assets.profile_img}
+                                            onError={(e) => { e.currentTarget.src = assets.profile_img }}
+                                            alt=''
+                                            className='w-12 h-12 rounded-full object-cover shadow-sm'
+                                        />
+                                        {t.unread > 0 && (
+                                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-600 border-2 border-white rounded-full"></span>
+                                        )}
+                                    </div>
                                     <div className='min-w-0 flex-1'>
-                                        <div className='flex justify-between gap-2'>
-                                            <span className='font-medium text-slate-900 truncate'>
+                                        <div className='flex justify-between items-start gap-2'>
+                                            <span className={`font-semibold text-slate-900 truncate ${t.unread > 0 ? 'text-indigo-900' : ''}`}>
                                                 {t.candidateName}
                                             </span>
-                                            {t.unread > 0 && (
-                                                <span className='shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white'>
-                                                    {t.unread}
+                                            {t.lastMessage && (
+                                                <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                                    {new Date(t.lastMessage.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                                                 </span>
                                             )}
                                         </div>
-                                        <p className='text-xs text-slate-500 truncate'>{t.jobTitle}</p>
+                                        <p className='text-xs text-slate-500 truncate font-medium'>{t.jobTitle}</p>
                                         {t.lastMessage && (
-                                            <p className='text-xs text-slate-400 truncate mt-1'>
+                                            <p className={`text-xs truncate mt-1 ${t.unread > 0 ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
                                                 {t.lastMessage.fromUser ? '' : 'You: '}{t.lastMessage.body}
                                             </p>
                                         )}
@@ -147,13 +148,10 @@ const RecruiterMessages = () => {
 
                 <section className='lg:col-span-3'>
                     <MessageChatPanel
-                        backendUrl={backendUrl}
                         applicationId={applicationId}
-                        authHeaders={headers}
                         peerLabel={active?.candidateName || 'Candidate'}
                         peerImage={active?.candidateImage}
                         draftRole='company'
-                        realtimeToken={companyToken}
                         onDraft={handleDraft}
                         loadingDraft={loadingDraft}
                         aiDraftTrigger={aiDraftTrigger}

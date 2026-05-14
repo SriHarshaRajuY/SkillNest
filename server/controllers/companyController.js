@@ -11,26 +11,25 @@ import { fetchResumeBuffer } from './userController.js'
 import aiService from '../services/aiService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
 import { cacheGet, cacheSet } from '../utils/redisClient.js'
+import logger from '../utils/logger.js'
 
-// ─── Register a new company ───────────────────────────────────────────────────
-export const registerCompany = async (req, res) => {
+// @desc    Register a new company
+// @route   POST /api/company/register
+// @access  Public
+export const registerCompany = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body
     const imageFile = req.file
 
-    if (!name || !email || !password || !imageFile) {
-        removeLocalFile(imageFile?.path)
-        return res.status(400).json({ success: false, message: 'Name, email, password, and company logo are required' })
-    }
-
-    if (password.length < 8) {
-        removeLocalFile(imageFile?.path)
-        return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long' })
+    if (!imageFile) {
+        res.status(400)
+        throw new Error('Company logo is required')
     }
 
     try {
         const exists = await Company.findOne({ email: email.toLowerCase().trim() })
         if (exists) {
-            return res.status(409).json({ success: false, message: 'An account with this email already exists. Please login instead.' })
+            res.status(409)
+            throw new Error('An account with this email already exists')
         }
 
         const hashPassword = await bcrypt.hash(password, 10)
@@ -47,117 +46,109 @@ export const registerCompany = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            company: { _id: company._id, name: company.name, email: company.email, image: company.image },
-            token: generateToken(company._id),
+            message: 'Company registered successfully',
+            data: {
+                company: { _id: company._id, name: company.name, email: company.email, image: company.image },
+                token: generateToken(company._id),
+            }
         })
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(409).json({ success: false, message: 'An account with this email already exists.' })
-        }
-        console.error('[registerCompany]', error.message)
-        res.status(500).json({ success: false, message: 'Registration failed. Please try again.' })
     } finally {
         removeLocalFile(imageFile?.path)
     }
-}
+})
 
-// ─── Login company ────────────────────────────────────────────────────────────
-export const loginCompany = async (req, res) => {
+// @desc    Login company
+// @route   POST /api/company/login
+// @access  Public
+export const loginCompany = asyncHandler(async (req, res) => {
     const { email, password } = req.body
 
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: 'Email and password are required' })
+    const company = await Company.findOne({ email: email.toLowerCase().trim() })
+    if (!company) {
+        res.status(401)
+        throw new Error('Invalid email or password')
     }
 
-    try {
-        const company = await Company.findOne({ email: email.toLowerCase().trim() })
-        if (!company) {
-            return res.status(401).json({ success: false, message: 'Invalid email or password' })
-        }
+    const isMatch = await bcrypt.compare(password, company.password)
+    if (!isMatch) {
+        res.status(401)
+        throw new Error('Invalid email or password')
+    }
 
-        const isMatch = await bcrypt.compare(password, company.password)
-        if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Invalid email or password' })
-        }
-
-        res.json({
-            success: true,
+    res.json({
+        success: true,
+        message: 'Login successful',
+        data: {
             company: { _id: company._id, name: company.name, email: company.email, image: company.image },
             token: generateToken(company._id),
-        })
-    } catch (error) {
-        console.error('[loginCompany]', error.message)
-        res.status(500).json({ success: false, message: 'Login failed. Please try again.' })
-    }
-}
+        }
+    })
+})
 
-// ─── Get company data ─────────────────────────────────────────────────────────
-export const getCompanyData = async (req, res) => {
-    try {
-        // req.company is set by protectCompany middleware (password already excluded)
-        res.json({ success: true, company: req.company })
-    } catch (error) {
-        console.error('[getCompanyData]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to load company data' })
-    }
-}
+// @desc    Get company data
+// @route   GET /api/company/company
+// @access  Private (Company)
+export const getCompanyData = asyncHandler(async (req, res) => {
+    res.json({ 
+        success: true, 
+        message: 'Company data fetched successfully',
+        data: { company: req.company } 
+    })
+})
 
-// ─── Post a new job ───────────────────────────────────────────────────────────
-export const postJob = async (req, res) => {
+// @desc    Post a new job
+// @route   POST /api/company/post-job
+// @access  Private (Company)
+export const postJob = asyncHandler(async (req, res) => {
     const { title, description, location, salary, level, category } = req.body
     const companyId = req.company._id
 
-    if (!title || !description || !location || !salary || !level || !category) {
-        return res.status(400).json({ success: false, message: 'All fields are required' })
-    }
-
-    // Reject empty Quill editor output
     const trimmedDescription = description.trim()
     if (!trimmedDescription || trimmedDescription === '<p><br></p>') {
-        return res.status(400).json({ success: false, message: 'Please enter a job description' })
+        res.status(400)
+        throw new Error('Please enter a job description')
     }
 
-    if (isNaN(Number(salary)) || Number(salary) <= 0) {
-        return res.status(400).json({ success: false, message: 'Please enter a valid salary' })
-    }
+    const job = await Job.create({
+        title: title.trim(),
+        description: trimmedDescription,
+        location: location.trim(),
+        salary: Number(salary),
+        companyId,
+        date: Date.now(),
+        level,
+        category,
+    })
 
-    try {
-        const job = await Job.create({
-            title: title.trim(),
-            description: trimmedDescription,
-            location: location.trim(),
-            salary: Number(salary),
-            companyId,
-            date: Date.now(),
-            level,
-            category,
-        })
+    res.status(201).json({ 
+        success: true, 
+        message: 'Job posted successfully', 
+        data: { job } 
+    })
+})
 
-        res.status(201).json({ success: true, message: 'Job posted successfully!', job })
-    } catch (error) {
-        console.error('[postJob]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to post job' })
-    }
-}
+// @desc    Get applicants for this company's jobs
+// @route   GET /api/company/applicants
+// @access  Private (Company)
+export const getCompanyJobApplicants = asyncHandler(async (req, res) => {
+    const companyId = req.company._id
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 20)
+    const skip = (page - 1) * limit
 
-// ─── Get applicants for this company's jobs (Paginated) ───────────────────────
-export const getCompanyJobApplicants = async (req, res) => {
-    try {
-        const companyId = req.company._id
-        const page = parseInt(req.query.page) || 1
-        const limit = parseInt(req.query.limit) || 10
-        const skip = (page - 1) * limit
+    const totalResults = await JobApplication.countDocuments({ companyId })
+    const applications = await JobApplication.find({ companyId })
+        .populate('userId', 'name image resume')
+        .populate('jobId', 'title location category level salary')
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
 
-        const totalResults = await JobApplication.countDocuments({ companyId })
-        const applications = await JobApplication.find({ companyId })
-            .populate('userId', 'name image resume')
-            .populate('jobId', 'title location category level salary')
-            .sort({ date: -1 })
-            .skip(skip)
-            .limit(limit)
-
-        res.json({ 
-            success: true, 
+    res.json({ 
+        success: true, 
+        message: 'Applicants fetched successfully',
+        data: {
             applications,
             pagination: {
                 totalResults,
@@ -165,264 +156,301 @@ export const getCompanyJobApplicants = async (req, res) => {
                 currentPage: page,
                 limit
             }
-        })
-    } catch (error) {
-        console.error('[getCompanyJobApplicants]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to load applicants' })
-    }
-}
+        }
+    })
+})
 
-// ─── Get all jobs posted by this company (Paginated) ─────────────────────────
-export const getCompanyPostedJobs = async (req, res) => {
-    try {
-        const companyId = req.company._id
-        const page = parseInt(req.query.page) || 1
-        const limit = parseInt(req.query.limit) || 10
-        const skip = (page - 1) * limit
+// @desc    Get all jobs posted by this company
+// @route   GET /api/company/list-jobs
+// @access  Private (Company)
+export const getCompanyPostedJobs = asyncHandler(async (req, res) => {
+    const companyId = req.company._id
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 20)
+    const skip = (page - 1) * limit
 
-        const totalResults = await Job.countDocuments({ companyId })
-        const jobs = await Job.find({ companyId })
-            .sort({ date: -1 })
-            .skip(skip)
-            .limit(limit)
+    const totalResults = await Job.countDocuments({ companyId })
+    const jobs = await Job.find({ companyId })
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
 
-        const jobsData = await Promise.all(jobs.map(async (job) => {
-            const count = await JobApplication.countDocuments({ jobId: job._id })
-            return { ...job.toObject(), applicants: count }
-        }))
+    const jobsData = await Promise.all(jobs.map(async (job) => {
+        const count = await JobApplication.countDocuments({ jobId: job._id })
+        return { ...job, applicants: count }
+    }))
 
-        res.json({ 
-            success: true, 
-            jobsData,
+    res.json({ 
+        success: true, 
+        message: 'Posted jobs fetched successfully',
+        data: {
+            jobs: jobsData,
             pagination: {
                 totalResults,
                 totalPages: Math.ceil(totalResults / limit),
                 currentPage: page,
                 limit
             }
-        })
-    } catch (error) {
-        console.error('[getCompanyPostedJobs]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to load jobs' })
-    }
-}
-
-// ─── Pipeline / legacy status ───────────────────────────────────────────────────
-export const changeJobApplicationStatus = async (req, res) => {
-    const { id, pipelineStage, status } = req.body
-
-    if (!id) {
-        return res.status(400).json({ success: false, message: 'Application ID is required' })
-    }
-
-    let stage = pipelineStage
-    if (!stage && status) {
-        if (status === 'Accepted') stage = 'Offer'
-        else if (status === 'Rejected') stage = 'Rejected'
-        else stage = 'Applied'
-    }
-
-    if (!stage || !PIPELINE_STAGES.includes(stage)) {
-        return res.status(400).json({
-            success: false,
-            message: `pipelineStage must be one of: ${PIPELINE_STAGES.join(', ')}`,
-        })
-    }
-
-    try {
-        const application = await JobApplication.findOne({
-            _id: id,
-            companyId: req.company._id,
-        })
-        if (!application) {
-            return res.status(404).json({ success: false, message: 'Application not found' })
         }
+    })
+})
 
-        application.pipelineStage = stage
-        await application.save()
+// @desc    Update application pipeline stage
+// @route   POST /api/company/change-status
+// @access  Private (Company)
+export const changeJobApplicationStatus = asyncHandler(async (req, res) => {
+    const { id, pipelineStage } = req.body
 
-        await application.populate('userId', 'name image resume')
-        await application.populate('jobId', 'title location category level salary')
-
-        emitToApplication(String(application._id), 'pipeline:updated', {
-            applicationId: String(application._id),
-            pipelineStage: application.pipelineStage,
-            pipelineHistory: application.pipelineHistory,
-            status: application.status,
-            updatedAt: application.updatedAt,
-        })
-
-        res.json({
-            success: true,
-            message: 'Pipeline updated',
-            application,
-        })
-    } catch (error) {
-        console.error('[changeJobApplicationStatus]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to update pipeline' })
+    const application = await JobApplication.findOne({
+        _id: id,
+        companyId: req.company._id,
+    })
+    
+    if (!application) {
+        res.status(404)
+        throw new Error('Application not found')
     }
-}
 
-// ─── Internal hiring-team notes (recruiters only, real-time) ───────────────────
-export const addInternalNote = async (req, res) => {
+    application.pipelineStage = pipelineStage
+    await application.save()
+
+    emitToApplication(String(application._id), 'pipeline:updated', {
+        applicationId: String(application._id),
+        pipelineStage: application.pipelineStage,
+        pipelineHistory: application.pipelineHistory,
+        updatedAt: application.updatedAt,
+    })
+
+    res.json({
+        success: true,
+        message: 'Pipeline stage updated successfully',
+        data: { application }
+    })
+})
+
+// @desc    Add an internal note to an application
+// @route   POST /api/company/applications/:applicationId/internal-notes
+// @access  Private (Company)
+export const addInternalNote = asyncHandler(async (req, res) => {
     const { applicationId } = req.params
-    const { body, rating } = req.body
-    const text = typeof body === 'string' ? body.trim() : ''
+    const { content, rating } = req.body
+    const text = typeof content === 'string' ? content.trim() : ''
 
-    if (!applicationId || !text) {
-        return res.status(400).json({ success: false, message: 'Note text is required' })
+    if (!text) {
+        res.status(400)
+        throw new Error('Note content is required')
     }
 
-    let ratingNum
-    if (rating !== undefined && rating !== null && rating !== '') {
-        ratingNum = Number(rating)
-        if (Number.isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-            return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' })
-        }
+    const application = await JobApplication.findOne({
+        _id: applicationId,
+        companyId: req.company._id,
+    })
+
+    if (!application) {
+        res.status(404)
+        throw new Error('Application not found')
     }
 
-    try {
-        const application = await JobApplication.findOne({
-            _id: applicationId,
-            companyId: req.company._id,
-        })
+    application.internalNotes.push({
+        authorCompanyId: req.company._id,
+        authorName: req.company.name,
+        body: text.slice(0, 4000),
+        rating: rating ? Number(rating) : undefined,
+    })
+    await application.save()
 
-        if (!application) {
-            return res.status(404).json({ success: false, message: 'Application not found' })
-        }
+    emitToApplication(String(application._id), 'feedback:updated', {
+        applicationId: String(application._id),
+        internalNotes: application.internalNotes,
+    })
 
-        application.internalNotes.push({
-            authorCompanyId: req.company._id,
-            authorName: req.company.name,
-            body: text.slice(0, 4000),
-            rating: ratingNum,
-        })
-        await application.save()
+    res.status(201).json({ 
+        success: true, 
+        message: 'Note added successfully',
+        data: { internalNotes: application.internalNotes } 
+    })
+})
 
-        emitToApplication(String(application._id), 'feedback:updated', {
-            applicationId: String(application._id),
-            internalNotes: application.internalNotes,
-        })
-
-        res.status(201).json({ success: true, internalNotes: application.internalNotes })
-    } catch (error) {
-        console.error('[addInternalNote]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to save note' })
-    }
-}
-
-// ─── Toggle job visibility ────────────────────────────────────────────────────
-export const changeVisibility = async (req, res) => {
+// @desc    Toggle job visibility
+// @route   POST /api/company/change-visibility
+// @access  Private (Company)
+export const changeVisibility = asyncHandler(async (req, res) => {
     const { id } = req.body
 
-    if (!id) {
-        return res.status(400).json({ success: false, message: 'Job ID is required' })
+    const job = await Job.findOne({ _id: id, companyId: req.company._id })
+    if (!job) {
+        res.status(404)
+        throw new Error('Job not found')
     }
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ success: false, message: 'Invalid job ID' })
-    }
 
-    try {
-        const job = await Job.findOne({ _id: id, companyId: req.company._id })
-        if (!job) return res.status(404).json({ success: false, message: 'Job not found' })
+    job.visible = !job.visible
+    await job.save()
 
-        job.visible = !job.visible
-        await job.save()
+    res.json({ 
+        success: true, 
+        message: `Job is now ${job.visible ? 'visible' : 'hidden'}`, 
+        data: { job } 
+    })
+})
 
-        res.json({ success: true, message: `Job is now ${job.visible ? 'visible' : 'hidden'}`, job })
-    } catch (error) {
-        console.error('[changeVisibility]', error.message)
-        res.status(500).json({ success: false, message: 'Failed to update job visibility' })
-    }
-}
-
-
-// ─── AI Resume Matcher ────────────────────────────────────────────────────────
+// @desc    AI Resume Matcher
+// @route   GET /api/company/match-resume/:applicationId
+// @access  Private (Company)
 export const matchResume = asyncHandler(async (req, res) => {
-    const { applicationId } = req.params;
-    const companyId = req.company._id;
+    const { applicationId } = req.params
+    const companyId = req.company._id
 
-    if (!mongoose.Types.ObjectId.isValid(applicationId)) {
-        return res.status(400).json({ success: false, message: 'Invalid application ID' });
-    }
-
-    // Check cache first
-    const cacheKey = `match:${applicationId}`;
-    let cached;
-    try {
-        cached = await cacheGet(cacheKey);
-    } catch (err) {
-        console.warn('[matchResume] Redis error:', err.message);
-    }
+    const cacheKey = `match:${applicationId}`
+    let cached = await cacheGet(cacheKey).catch(() => null)
     
     if (cached) {
-        return res.json({ success: true, ...cached, cached: true });
+        return res.json({ 
+            success: true, 
+            message: 'Match result fetched from cache',
+            data: { ...cached, cached: true } 
+        })
     }
 
     const application = await JobApplication.findOne({ _id: applicationId, companyId })
         .populate('userId', 'resume resumeAsset')
-        .populate('jobId', 'description companyId');
+        .populate('jobId', 'description')
 
     if (!application) {
-        return res.status(404).json({ success: false, message: 'Application not found' });
-    }
-
-    if (!application.jobId) {
-        return res.status(404).json({ success: false, message: 'The linked job record could not be found.' });
+        res.status(404)
+        throw new Error('Application not found')
     }
 
     if (!application.userId?.resume) {
-        return res.status(400).json({ success: false, message: 'No resume found for this applicant.' });
+        res.status(400)
+        throw new Error('No resume found for this applicant')
     }
 
-    try {
-        const { buffer } = await fetchResumeBuffer(application.userId);
-        const resumeText = await aiService.parsePDF(buffer);
-        const jobDescription = application.jobId.description;
+    const { buffer } = await fetchResumeBuffer(application.userId)
+    const resumeText = await aiService.parsePDF(buffer)
+    const result = await aiService.generateMatchScore(resumeText, application.jobId.description)
+    
+    application.matchScore = result.score
+    await application.save()
 
-        const result = await aiService.generateMatchScore(resumeText, jobDescription);
-        application.matchScore = result.score;
-        await application.save();
+    await cacheSet(cacheKey, { score: result.score, reason: result.reason }).catch(() => null)
 
-        // Store in cache for 24 hours
-        try {
-            await cacheSet(cacheKey, { score: result.score, reason: result.reason });
-        } catch (err) {
-            console.warn('[matchResume] Could not set cache:', err.message);
-        }
-
-        return res.json({ success: true, score: result.score, reason: result.reason });
-    } catch (error) {
-        console.error('[matchResume]', error.message);
-        if (error.message.includes('timed out')) {
-            return res.status(504).json({ success: false, message: error.message });
-        }
-        if (error.message.includes('Cloudinary responded')) {
-            return res.status(502).json({ success: false, message: 'Failed to fetch resume: ' + error.message });
-        }
-        if (error.message.includes('currently unavailable')) {
-            return res.status(503).json({ success: false, message: error.message });
-        }
-        if (error.message.includes('Unreadable')) {
-            return res.status(400).json({ success: false, message: 'The uploaded resume is unreadable or empty. Please ensure it is a valid text-based PDF.' });
-        }
-        res.status(500).json({ success: false, message: error.message || 'AI analysis failed.' });
-    }
+    res.json({ 
+        success: true, 
+        message: 'AI analysis completed',
+        data: { score: result.score, reason: result.reason } 
+    })
 })
 
-// ─── AI Diversity Audit ───────────────────────────────────────────────────────
-export const auditJob = asyncHandler(async (req, res) => {
-    const { description } = req.body;
+// @desc    AI Resume Summary
+// @route   GET /api/company/resume-summary/:applicationId
+// @access  Private (Company)
+export const getResumeSummary = asyncHandler(async (req, res) => {
+    const { applicationId } = req.params
+    const companyId = req.company._id
 
-    if (!description || description.trim() === '' || description === '<p><br></p>') {
-        return res.status(400).json({ success: false, message: 'Job description is required for audit.' });
+    const cacheKey = `summary:${applicationId}`
+    let cached = await cacheGet(cacheKey).catch(() => null)
+    
+    if (cached) {
+        return res.json({ 
+            success: true, 
+            message: 'Summary fetched from cache',
+            data: { ...cached, cached: true } 
+        })
     }
 
-    try {
-        const result = await aiService.auditJobDescription(description);
-        res.json({ success: true, audit: result });
-    } catch (error) {
-        console.error('[auditJob]', error.message);
-        res.status(500).json({ success: false, message: 'Failed to perform diversity audit.' });
+    const application = await JobApplication.findOne({ _id: applicationId, companyId })
+        .populate('userId', 'resume resumeAsset')
+
+    if (!application) {
+        res.status(404)
+        throw new Error('Application not found')
     }
-});
+
+    if (!application.userId?.resume) {
+        res.status(400)
+        throw new Error('No resume found for this applicant')
+    }
+
+    const { buffer } = await fetchResumeBuffer(application.userId)
+    const resumeText = await aiService.parsePDF(buffer)
+    const result = await aiService.generateResumeSummary(resumeText)
+
+    await cacheSet(cacheKey, result).catch(() => null)
+
+    res.json({ 
+        success: true, 
+        message: 'AI summary generated',
+        data: result 
+    })
+})
+
+// @desc    Get recruiter analytics
+// @route   GET /api/company/analytics
+// @access  Private (Company)
+export const getRecruiterAnalytics = asyncHandler(async (req, res) => {
+    const companyId = req.company._id
+
+    // 1. Applications Per Job
+    const appsPerJob = await Job.aggregate([
+        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+        {
+            $lookup: {
+                from: 'jobapplications',
+                localField: '_id',
+                foreignField: 'jobId',
+                as: 'apps'
+            }
+        },
+        {
+            $project: {
+                title: 1,
+                count: { $size: '$apps' }
+            }
+        },
+        { $sort: { count: -1 } }
+    ])
+
+    // 2. Hiring Pipeline Distribution
+    const pipelineDist = await JobApplication.aggregate([
+        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+        {
+            $group: {
+                _id: '$pipelineStage',
+                count: { $sum: 1 }
+            }
+        }
+    ])
+
+    // Normalize pipeline distribution to ensure all stages are present
+    const stagesMap = PIPELINE_STAGES.reduce((acc, stage) => {
+        acc[stage] = 0
+        return acc
+    }, {})
+    pipelineDist.forEach(d => {
+        stagesMap[d._id] = d.count
+    })
+
+    // 3. Hiring Funnel Summary
+    const totalApplicants = await JobApplication.countDocuments({ companyId })
+    const interviews = stagesMap['Interview'] + stagesMap['Offer'] + stagesMap['Hired']
+    const hires = stagesMap['Hired']
+
+    res.json({
+        success: true,
+        message: 'Analytics fetched successfully',
+        data: {
+            appsPerJob,
+            pipelineDistribution: Object.entries(stagesMap).map(([stage, count]) => ({ stage, count })),
+            summary: {
+                totalApplicants,
+                interviews,
+                hires,
+                rejectionRate: totalApplicants > 0 
+                    ? Math.round((stagesMap['Rejected'] / totalApplicants) * 100) 
+                    : 0
+            }
+        }
+    })
+})

@@ -18,7 +18,8 @@ export function useSkillNestSocket({ backendUrl, authToken, applicationIds = [],
         const socket = io(backendUrl, {
             auth: { token: authToken },
             reconnectionAttempts: 8,
-            reconnectionDelay: 800,
+            reconnectionDelay: 1000,
+            transports: ['websocket'], // Prefer websockets for stability
         })
 
         socketRef.current = socket
@@ -50,4 +51,12 @@ export function useSkillNestSocket({ backendUrl, authToken, applicationIds = [],
             joinRooms(socket, applicationIds)
         }
     }, [applicationIds, joinRooms])
+
+    const emit = useCallback((event, data) => {
+        if (socketRef.current?.connected) {
+            socketRef.current.emit(event, data)
+        }
+    }, [])
+
+    return { emit, connected: socketRef.current?.connected || false }
 }

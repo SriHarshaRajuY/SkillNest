@@ -1,11 +1,13 @@
 import { Webhook } from "svix";
 import User from "../models/User.js";
+import logger from "../utils/logger.js";
 
-// API Controller Function to Manage Clerk User with database
+/**
+ * Clerk Webhook Handler
+ * Syncs user profile changes from Clerk to MongoDB.
+ */
 export const clerkWebhooks = async (req, res) => {
     try {
-
-        // Create a Svix instance with clerk webhook secret.
         const whook = new Webhook(process.env.CLERK_WEBHOOK_SECRET)
 
         // Verifying Headers
@@ -15,35 +17,36 @@ export const clerkWebhooks = async (req, res) => {
             "svix-signature": req.headers["svix-signature"]
         })
 
-        // Getting Data from request body
         const { data, type } = req.body
 
-        // Switch Cases for different Events
         switch (type) {
             case 'user.created': {
                 const userData = {
                     _id: data.id,
-                    email: data.email_addresses[0].email_address,
-                    name: (data.first_name || '') + " " + (data.last_name || ''),
+                    email: data.email_addresses[0]?.email_address || '',
+                    name: ((data.first_name || '') + " " + (data.last_name || '')).trim(),
                     image: data.image_url,
                     resume: ''
                 }
                 await User.create(userData)
+                logger.info('User created via webhook', { userId: data.id })
                 return res.json({ success: true })
             }
 
             case 'user.updated': {
                 const userData = {
-                    email: data.email_addresses[0].email_address,
-                    name: (data.first_name || '') + " " + (data.last_name || ''),
+                    email: data.email_addresses[0]?.email_address || '',
+                    name: ((data.first_name || '') + " " + (data.last_name || '')).trim(),
                     image: data.image_url,
                 }
                 await User.findByIdAndUpdate(data.id, userData)
+                logger.info('User updated via webhook', { userId: data.id })
                 return res.json({ success: true })
             }
 
             case 'user.deleted': {
                 await User.findByIdAndDelete(data.id)
+                logger.info('User deleted via webhook', { userId: data.id })
                 return res.json({ success: true })
             }
 
@@ -52,7 +55,7 @@ export const clerkWebhooks = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Webhook error:', error.message)
-        res.status(400).json({ success: false, message: error.message })
+        logger.error('Webhook processing failed', error)
+        res.status(400).json({ success: false, message: 'Webhook verification failed' })
     }
 }

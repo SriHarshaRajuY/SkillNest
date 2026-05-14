@@ -199,11 +199,12 @@ const Applications = () => {
                                         const res = await fetch(`${backendUrl}/api/users/resume`, {
                                             headers: { Authorization: `Bearer ${token}` }
                                         })
-                                        const data = await res.json()
-                                        if (data.success && data.url) {
-                                            window.open(data.url, '_blank')
+                                        const result = await res.json()
+                                        // result is { success, message, data: { url } }
+                                        if (result.success && result.data?.url) {
+                                            window.open(result.data.url, '_blank')
                                         } else {
-                                            toast.error(data.message || 'Could not load resume')
+                                            toast.error(result.message || 'Could not load resume')
                                         }
                                     } catch { toast.error('Failed to open resume') }
                                 }}

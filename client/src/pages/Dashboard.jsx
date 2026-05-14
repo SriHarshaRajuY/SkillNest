@@ -24,7 +24,6 @@ const Dashboard = () => {
         }
     }, [companyLoaded, companyData, location.pathname])
 
-    // Show loading spinner while company profile is being fetched
     if (!companyLoaded) {
         return <Loading />
     }
@@ -107,6 +106,16 @@ const Dashboard = () => {
                         >
                             <span className='min-w-5 w-5 text-center text-xl transition-transform group-hover:scale-110' aria-hidden>💬</span>
                             <p className='max-sm:hidden text-sm font-semibold'>Messages</p>
+                        </NavLink>
+
+                        <NavLink
+                            className={({ isActive }) =>
+                                `flex items-center p-3 sm:px-4 gap-3 w-full rounded-xl transition-all duration-200 group ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'hover:bg-gray-50 hover:text-gray-900'}`
+                            }
+                            to='/dashboard/analytics'
+                        >
+                            <span className='min-w-5 w-5 text-center text-xl transition-transform group-hover:scale-110' aria-hidden>📊</span>
+                            <p className='max-sm:hidden text-sm font-semibold'>Analytics</p>
                         </NavLink>
                     </ul>
                 </aside>

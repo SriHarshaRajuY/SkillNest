@@ -71,12 +71,12 @@ const Hero = () => {
             <div className='border border-gray-200 bg-white shadow-sm mx-2 mt-8 p-8 rounded-xl flex animate-fade-in-delay-1'>
                 <div className='flex justify-center items-center gap-10 lg:gap-16 flex-wrap w-full'>
                     <p className='font-semibold text-gray-500 uppercase tracking-wider text-sm'>Trusted by</p>
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.microsoft_logo} alt='Microsoft' />
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.walmart_logo} alt='Walmart' />
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.accenture_logo} alt='Accenture' />
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.samsung_logo} alt='Samsung' />
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.amazon_logo} alt='Amazon' />
-                    <img className='h-7 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer' src={assets.adobe_logo} alt='Adobe' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.microsoft_logo} alt='Microsoft' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.walmart_logo} alt='Walmart' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.accenture_logo} alt='Accenture' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.samsung_logo} alt='Samsung' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.amazon_logo} alt='Amazon' />
+                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.adobe_logo} alt='Adobe' />
                 </div>
             </div>
         </div>

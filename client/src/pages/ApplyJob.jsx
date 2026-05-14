@@ -10,7 +10,7 @@ import JobCard from '../components/JobCard'
 import Footer from '../components/Footer'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth, useUser, useClerk } from '@clerk/clerk-react'
 
 const ApplyJob = () => {
 
@@ -18,6 +18,7 @@ const ApplyJob = () => {
 
   const { getToken } = useAuth()
   const { user } = useUser()
+  const { openSignIn } = useClerk()
 
   const navigate = useNavigate()
 
@@ -49,7 +50,9 @@ const ApplyJob = () => {
 
       // Not logged in at all (Clerk)
       if (!user) {
-        return toast.error('Please login to apply for jobs')
+        toast.info('Please sign in to apply for this job')
+        openSignIn()
+        return
       }
 
       // Still fetching profile from server
@@ -107,33 +110,35 @@ const ApplyJob = () => {
     <>
       <Navbar />
 
-      <div className='min-h-screen flex flex-col py-10 container px-4 2xl:px-20 mx-auto'>
+      <div className='min-h-screen flex flex-col py-10 container px-4 2xl:px-20 mx-auto animate-fade-in'>
         <div className='bg-white text-black rounded-lg w-ful'>
-          <div className='flex justify-center md:justify-between flex-wrap gap-8 px-14 py-20  mb-6 bg-sky-50 border border-sky-400 rounded-xl'>
+          <div className='flex justify-center md:justify-between flex-wrap gap-8 px-14 py-20 mb-6 bg-slate-50 border border-slate-200 rounded-3xl shadow-sm'>
             <div className='flex flex-col md:flex-row items-center'>
-              <img
-                className='h-24 bg-white rounded-lg p-4 mr-4 max-md:mb-4 border'
-                src={JobData.companyId.image || assets.company_icon}
-                onError={(e) => { e.currentTarget.src = assets.company_icon }}
-                alt=""
-              />
-              <div className='text-center md:text-left text-neutral-700'>
-                <h1 className='text-2xl sm:text-4xl font-medium'>{JobData.title}</h1>
-                <div className='flex flex-row flex-wrap max-md:justify-center gap-y-2 gap-6 items-center text-gray-600 mt-2'>
-                  <span className='flex items-center gap-1'>
-                    <img src={assets.suitcase_icon} alt="" />
+              <div className='bg-white rounded-2xl p-6 mr-6 max-md:mb-4 border border-slate-100 shadow-sm'>
+                <img
+                  className='h-16 w-16 object-contain'
+                  src={JobData.companyId.image || assets.company_icon}
+                  onError={(e) => { e.currentTarget.src = assets.company_icon }}
+                  alt=""
+                />
+              </div>
+              <div className='text-center md:text-left text-neutral-800'>
+                <h1 className='text-2xl sm:text-4xl font-bold tracking-tight text-slate-900'>{JobData.title}</h1>
+                <div className='flex flex-row flex-wrap max-md:justify-center gap-y-2 gap-6 items-center text-slate-500 mt-4 font-medium'>
+                  <span className='flex items-center gap-2'>
+                    <img className='h-4 w-4 opacity-60' src={assets.suitcase_icon} alt="" />
                     {JobData.companyId.name}
                   </span>
-                  <span className='flex items-center gap-1'>
-                    <img src={assets.location_icon} alt="" />
+                  <span className='flex items-center gap-2'>
+                    <img className='h-4 w-4 opacity-60' src={assets.location_icon} alt="" />
                     {JobData.location}
                   </span>
-                  <span className='flex items-center gap-1'>
-                    <img src={assets.person_icon} alt="" />
+                  <span className='flex items-center gap-2'>
+                    <img className='h-4 w-4 opacity-60' src={assets.person_icon} alt="" />
                     {JobData.level}
                   </span>
-                  <span className='flex items-center gap-1'>
-                    <img src={assets.money_icon} alt="" />
+                  <span className='flex items-center gap-2'>
+                    <img className='h-4 w-4 opacity-60' src={assets.money_icon} alt="" />
                     CTC: {kconvert.convertTo(JobData.salary)}
                   </span>
                 </div>
@@ -141,40 +146,51 @@ const ApplyJob = () => {
             </div>
 
             <div className='flex flex-col justify-center text-end text-sm max-md:mx-auto max-md:text-center'>
-              <button onClick={applyHandler} className='bg-blue-600 p-2.5 px-10 text-white rounded'>{isAlreadyApplied ? 'Already Applied' : 'Apply Now'}</button>
-              <p className='mt-1 text-gray-600'>Posted {moment(JobData.date).fromNow()}</p>
+              <button 
+                onClick={applyHandler} 
+                className={`p-3.5 px-12 text-white rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${isAlreadyApplied ? 'bg-emerald-500 cursor-default' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+              >
+                {isAlreadyApplied ? 'Already Applied' : 'Apply Now'}
+              </button>
+              <p className='mt-3 text-slate-400 font-medium'>Posted {moment(JobData.date).fromNow()}</p>
               
               {/* AI Transparency Disclosure */}
-              <div className='mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-left max-md:text-center'>
-                <div className='flex items-center gap-2 text-indigo-800 font-semibold mb-1 justify-end max-md:justify-center'>
-                  <span className='text-[10px] bg-indigo-200 px-1.5 py-0.5 rounded uppercase tracking-wider'>AI Assisted</span>
-                  <span className='w-4 h-4 rounded-full border border-indigo-300 text-[10px] inline-flex items-center justify-center opacity-70'>i</span>
+              <div className='mt-6 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-left max-md:text-center'>
+                <div className='flex items-center gap-2 text-indigo-800 font-bold mb-2 justify-start max-md:justify-center'>
+                  <span className='text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest'>Ethical AI</span>
+                  <span className='w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 text-[10px] inline-flex items-center justify-center font-black'>i</span>
                 </div>
-                <p className='text-[11px] text-indigo-600 leading-tight'>
-                  Your application will be analyzed by our ethical AI to help recruiters understand your fit. Final hiring decisions are always made by humans.
+                <p className='text-[12px] text-indigo-600 leading-relaxed font-medium'>
+                  Our AI analyzes matches fairly to help recruiters. All final decisions are human-verified.
                 </p>
               </div>
             </div>
 
           </div>
 
-          <div className='flex flex-col lg:flex-row justify-between items-start'>
+          <div className='flex flex-col lg:flex-row justify-between items-start mt-10'>
             <div className='w-full lg:w-2/3'>
-              <h2 className='font-bold text-2xl mb-4'>Job description</h2>
-              <div className='rich-text' dangerouslySetInnerHTML={{ __html: JobData.description }}></div>
-              <button onClick={applyHandler} className='bg-blue-600 p-2.5 px-10 text-white rounded mt-10'>{isAlreadyApplied ? 'Already Applied' : 'Apply Now'}</button>
+              <h2 className='font-bold text-2xl mb-6 text-slate-900 border-b border-slate-100 pb-4'>Job Description</h2>
+              <div className='rich-text text-slate-700 leading-relaxed' dangerouslySetInnerHTML={{ __html: JobData.description }}></div>
+              <button 
+                onClick={applyHandler} 
+                className={`p-3.5 px-12 text-white rounded-2xl font-bold shadow-lg transition-all active:scale-95 mt-12 ${isAlreadyApplied ? 'bg-emerald-500 cursor-default' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+              >
+                {isAlreadyApplied ? 'Already Applied' : 'Apply Now'}
+              </button>
             </div>
+            
             {/* Right Section More Jobs */}
-            <div className='w-full lg:w-1/3 mt-8 lg:mt-0 lg:ml-8 space-y-5'>
-              <h2>More jobs from {JobData.companyId.name}</h2>
-              {jobs.filter(job => job._id !== JobData._id && job.companyId._id === JobData.companyId._id)
-                .filter(job => {
-                  // Set of applied jobIds
-                  const appliedJobsIds = new Set(userApplications.map(app => app.jobId && app.jobId._id))
-                  // Return true if the user has not already applied for this job
-                  return !appliedJobsIds.has(job._id)
-                }).slice(0, 4)
-                .map((job, index) => <JobCard key={index} job={job} />)}
+            <div className='w-full lg:w-1/3 mt-12 lg:mt-0 lg:ml-12'>
+              <h2 className='font-bold text-xl text-slate-900 mb-6'>More jobs from <span className='text-indigo-600'>{JobData.companyId.name}</span></h2>
+              <div className='space-y-6'>
+                {jobs.filter(job => job._id !== JobData._id && job.companyId._id === JobData.companyId._id)
+                  .filter(job => {
+                    const appliedJobsIds = new Set(userApplications.map(app => app.jobId && app.jobId._id))
+                    return !appliedJobsIds.has(job._id)
+                  }).slice(0, 3)
+                  .map((job, index) => <JobCard key={index} job={job} />)}
+              </div>
             </div>
           </div>
 

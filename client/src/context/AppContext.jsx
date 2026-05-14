@@ -1,17 +1,20 @@
 import { createContext, useEffect, useState } from 'react'
-import axios from 'axios'
 import { toast } from 'react-toastify'
 import { useAuth, useUser } from '@clerk/clerk-react'
+
+// Services
+import { jobService } from '../services/jobService'
+import { authService } from '../services/authService'
+import { applicationService } from '../services/applicationService'
 
 /* eslint-disable-next-line react-refresh/only-export-components */
 export const AppContext = createContext()
 
 export const AppContextProvider = ({ children }) => {
-    // Strip trailing slash to avoid double-slash URLs like http://localhost:5000//api/...
-    const backendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
-
     const { user } = useUser()
     const { getToken } = useAuth()
+
+    const backendUrl = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
     const [searchFilter, setSearchFilter] = useState({ title: '', location: '' })
     const [isSearched, setIsSearched] = useState(false)
@@ -27,30 +30,26 @@ export const AppContextProvider = ({ children }) => {
     // ─── Fetch all public jobs ────────────────────────────────────────────────
     const fetchJobs = async () => {
         try {
-            const { data } = await axios.get(`${backendUrl}/api/jobs`)
-            if (data.success) {
-                setJobs(data.jobs)
+            const response = await jobService.getJobs()
+            if (response.success) {
+                setJobs(response.data.jobs)
             } else {
-                toast.error(data.message)
+                toast.error(response.message)
             }
-        } catch {
-            toast.error('Failed to load jobs. Please check your connection.')
+        } catch (error) {
+            toast.error(error.message || 'Failed to load jobs')
         }
     }
 
     // ─── Fetch company profile (recruiter) ───────────────────────────────────
     const fetchCompanyData = async () => {
         try {
-            const { data } = await axios.get(`${backendUrl}/api/company/company`, {
-                headers: { token: companyToken },
-            })
-            if (data.success) {
-                setCompanyData(data.company)
-            } else {
-                toast.error(data.message)
+            const response = await authService.getRecruiterProfile()
+            if (response.success) {
+                setCompanyData(response.data.company)
             }
         } catch (error) {
-            if (error.response?.status === 401) {
+            if (error.status === 401) {
                 setCompanyToken(null)
                 localStorage.removeItem('companyToken')
                 toast.error('Session expired. Please login again.')
@@ -66,15 +65,9 @@ export const AppContextProvider = ({ children }) => {
     const fetchUserData = async () => {
         try {
             const token = await getToken()
-            const { data } = await axios.get(`${backendUrl}/api/users/user`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            if (data.success) {
-                setUserData(data.user)
-            } else {
-                if (data.message !== 'User Not Found') {
-                    toast.error(data.message)
-                }
+            const response = await authService.getCandidateProfile(token)
+            if (response.success) {
+                setUserData(response.data.user)
             }
         } catch (error) {
             console.error('[fetchUserData]', error.message)
@@ -87,31 +80,26 @@ export const AppContextProvider = ({ children }) => {
     const fetchUserApplications = async () => {
         try {
             const token = await getToken()
-            const { data } = await axios.get(`${backendUrl}/api/users/applications`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            if (data.success) {
-                setUserApplications(data.applications)
-            } else {
-                toast.error(data.message)
+            const response = await applicationService.getMyApplications({}, token)
+            if (response.success) {
+                setUserApplications(response.data.applications)
             }
         } catch (error) {
             toast.error('Failed to load applications')
         }
     }
 
-    // ─── On mount: load jobs and restore company session ─────────────────────
+    // ─── Lifecycle ──────────────────────────────────────────────────────────
     useEffect(() => {
         fetchJobs()
         const storedToken = localStorage.getItem('companyToken')
         if (storedToken) {
             setCompanyToken(storedToken)
         } else {
-            setCompanyLoaded(true) // No token — nothing to load
+            setCompanyLoaded(true)
         }
     }, [])
 
-    // ─── When company token changes, fetch company profile ───────────────────
     useEffect(() => {
         if (companyToken) {
             setCompanyLoaded(false)
@@ -119,7 +107,6 @@ export const AppContextProvider = ({ children }) => {
         }
     }, [companyToken])
 
-    // ─── When Clerk user changes, fetch their profile + applications ──────────
     useEffect(() => {
         if (user) {
             setUserDataLoaded(false)
@@ -132,6 +119,7 @@ export const AppContextProvider = ({ children }) => {
     }, [user])
 
     const value = {
+        backendUrl,
         searchFilter, setSearchFilter,
         isSearched, setIsSearched,
         jobs, setJobs,
@@ -139,7 +127,6 @@ export const AppContextProvider = ({ children }) => {
         companyToken, setCompanyToken,
         companyData, setCompanyData,
         companyLoaded,
-        backendUrl,
         userData, setUserData,
         userApplications, setUserApplications,
         userDataLoaded,

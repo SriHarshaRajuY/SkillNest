@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "kill-port 5173 && vite",
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.17.1",
+    "@heroicons/react": "^2.2.0",
     "@sentry/react": "^10.50.0",
     "axios": "^1.7.9",
     "k-convert": "^1.0.6",
@@ -38,6 +39,7 @@
     "globals": "^15.12.0",
     "happy-dom": "^20.9.0",
     "jsdom": "^29.1.1",
+    "kill-port": "^2.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "vite": "^6.0.1",

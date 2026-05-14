@@ -1,3 +1,5 @@
+import logger from '../utils/logger.js'
+
 export const notFound = (req, res, next) => {
     const error = new Error(`Not Found - ${req.originalUrl}`)
     res.status(404)
@@ -26,7 +28,7 @@ export const errorHandler = (err, req, res, next) => {
         message = err.message
     }
 
-    console.error(`[Error Handler] ${err.message}`)
+    logger.error(`[GlobalErrorHandler] ${message}`, err)
 
     res.status(statusCode).json({
         success: false,

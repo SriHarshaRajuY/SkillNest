@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { recruiterService } from '../services/recruiterService'
 import { Link } from 'react-router-dom'
 
 const ApplicationDetailsPanel = ({
@@ -11,68 +13,130 @@ const ApplicationDetailsPanel = ({
     submitInternalNote,
     viewMode
 }) => {
+    const [summary, setSummary] = useState(null)
+    const [loadingSummary, setLoadingSummary] = useState(false)
+
+    useEffect(() => {
+        if (!selectedApplicant?._id) {
+            setSummary(null)
+            return
+        }
+
+        const fetchSummary = async () => {
+            setLoadingSummary(true)
+            try {
+                const response = await recruiterService.getResumeSummary(selectedApplicant._id)
+                if (response.success) {
+                    setSummary(response.data)
+                }
+            } catch (error) {
+                console.error('Failed to load AI summary', error)
+            } finally {
+                setLoadingSummary(false)
+            }
+        }
+
+        fetchSummary()
+    }, [selectedApplicant?._id])
+
     if (!selectedApplicant) return null
+
+    const renderSummary = () => (
+        <div className='mb-6 bg-indigo-50/50 border border-indigo-100 rounded-xl p-4'>
+            <div className='flex items-center gap-2 mb-2'>
+                <span className='text-xs font-bold uppercase tracking-widest text-indigo-600'>AI Resume Summary</span>
+                {loadingSummary && <div className='w-3 h-3 border border-indigo-500 border-t-transparent rounded-full animate-spin' />}
+            </div>
+            
+            {loadingSummary ? (
+                <div className='space-y-2'>
+                    <div className='h-3 bg-indigo-100 rounded w-full animate-pulse' />
+                    <div className='h-3 bg-indigo-100 rounded w-5/6 animate-pulse' />
+                    <div className='h-3 bg-indigo-100 rounded w-4/6 animate-pulse' />
+                </div>
+            ) : summary ? (
+                <>
+                    <p className='text-sm text-indigo-900/80 leading-relaxed mb-3'>{summary.summary}</p>
+                    <div className='flex flex-wrap gap-1.5'>
+                        {summary.topSkills?.map((skill, i) => (
+                            <span key={i} className='px-2 py-0.5 bg-white border border-indigo-200 text-indigo-700 text-[10px] font-bold rounded-full'>
+                                {skill}
+                            </span>
+                        ))}
+                    </div>
+                </>
+            ) : (
+                <p className='text-xs text-indigo-400 italic'>AI summary unavailable for this profile.</p>
+            )}
+        </div>
+    )
 
     if (viewMode === 'table') {
         return (
-            <div className='mt-6 border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden'>
+            <div className='mt-6 border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in'>
                 <div className='p-4 bg-gray-50 border-b flex justify-between items-center'>
                     <div>
-                        <p className='text-xs font-semibold text-gray-500 uppercase'>Team hiring room</p>
-                        <p className='font-medium text-gray-900'>{selectedApplicant.userId.name}</p>
+                        <p className='text-xs font-semibold text-gray-500 uppercase tracking-tight'>Team Hiring Room</p>
+                        <p className='font-bold text-gray-900'>{selectedApplicant.userId.name}</p>
                     </div>
                     <button type='button' className='text-sm text-gray-500 hover:text-gray-800' onClick={() => setSelectedId(null)}>Dismiss</button>
                 </div>
-                <div className='p-4 grid md:grid-cols-2 gap-6'>
+                <div className='p-4 grid md:grid-cols-2 gap-8'>
                     <div>
-                        <p className='text-xs font-semibold text-gray-500 uppercase mb-2'>Thread</p>
+                        {renderSummary()}
+                        <p className='text-xs font-semibold text-gray-500 uppercase mb-2 tracking-tight'>Direct Message</p>
                         <Link
                             to={`/dashboard/messages/${selectedApplicant._id}`}
-                            className='inline-flex items-center gap-2 text-indigo-600 font-semibold text-sm hover:text-indigo-800'
+                            className='inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all'
                         >
                             Open secure chat →
                         </Link>
-                        <div className='mt-4 space-y-3 max-h-56 overflow-y-auto'>
+                    </div>
+                    <div>
+                        <p className='text-xs font-semibold text-gray-500 uppercase mb-3 tracking-tight'>Internal Feed</p>
+                        <div className='space-y-3 max-h-64 overflow-y-auto pr-2 mb-4'>
                             {(selectedApplicant.internalNotes || []).length === 0 && (
-                                <p className='text-sm text-gray-400'>No internal notes.</p>
+                                <p className='text-sm text-gray-400 italic'>No internal notes yet.</p>
                             )}
                             {[...(selectedApplicant.internalNotes || [])].reverse().map((n) => (
-                                <div key={n._id} className='rounded-lg border border-gray-100 p-3 bg-slate-50'>
-                                    <div className='flex justify-between'>
-                                        <span className='text-sm font-medium'>{n.authorName}</span>
-                                        {n.rating ? <span className='text-amber-500 text-xs'>{'★'.repeat(n.rating)}</span> : null}
+                                <div key={n._id} className='rounded-xl border border-gray-100 p-3 bg-slate-50 shadow-sm'>
+                                    <div className='flex justify-between items-center'>
+                                        <span className='text-sm font-bold text-slate-800'>{n.authorName}</span>
+                                        {n.rating ? <span className='text-amber-500 text-xs font-bold'>{'★'.repeat(n.rating)}</span> : null}
                                     </div>
-                                    <p className='text-sm text-gray-700 mt-1'>{n.body}</p>
+                                    <p className='text-sm text-slate-600 mt-1.5 leading-relaxed'>{n.body}</p>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                    <div>
-                        <p className='text-xs font-semibold text-gray-500 uppercase mb-2'>Add note</p>
-                        <select
-                            value={noteRating}
-                            onChange={(e) => setNoteRating(Number(e.target.value))}
-                            className='w-full border rounded-lg px-2 py-2 text-sm mb-2'
-                        >
-                            {[5, 4, 3, 2, 1].map((r) => (
-                                <option key={r} value={r}>{r} stars</option>
-                            ))}
-                        </select>
-                        <textarea
-                            value={noteBody}
-                            onChange={(e) => setNoteBody(e.target.value)}
-                            placeholder='Internal hiring note…'
-                            rows={4}
-                            className='w-full border rounded-xl px-3 py-2 text-sm mb-2 focus:ring-2 focus:ring-indigo-500 outline-none'
-                        />
-                        <button
-                            type='button'
-                            disabled={savingNote}
-                            onClick={submitInternalNote}
-                            className='w-full py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold disabled:opacity-50'
-                        >
-                            {savingNote ? 'Saving…' : 'Share with team'}
-                        </button>
+                        <div className='border-t pt-4'>
+                            <p className='text-xs font-semibold text-gray-500 uppercase mb-2 tracking-tight'>Add Assessment</p>
+                            <div className='flex gap-2 mb-2'>
+                                <select
+                                    value={noteRating}
+                                    onChange={(e) => setNoteRating(Number(e.target.value))}
+                                    className='border rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
+                                >
+                                    {[5, 4, 3, 2, 1].map((r) => (
+                                        <option key={r} value={r}>{r} stars</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={noteBody}
+                                    onChange={(e) => setNoteBody(e.target.value)}
+                                    placeholder='Team feedback…'
+                                    className='flex-1 border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
+                                />
+                                <button
+                                    type='button'
+                                    disabled={savingNote || !noteBody.trim()}
+                                    onClick={submitInternalNote}
+                                    className='px-4 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all'
+                                >
+                                    {savingNote ? '...' : 'Add'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -80,69 +144,104 @@ const ApplicationDetailsPanel = ({
     }
 
     return (
-        <aside className='w-full xl:w-[360px] shrink-0 border border-gray-200 rounded-2xl bg-white shadow-lg overflow-hidden flex flex-col max-h-[calc(100vh-160px)]'>
-            <div className='p-4 border-b bg-gradient-to-r from-slate-900 to-indigo-900 text-white'>
-                <p className='text-xs uppercase tracking-wider text-white/70'>Team hiring room</p>
-                <p className='font-semibold text-lg truncate'>{selectedApplicant.userId.name}</p>
-                <p className='text-sm text-white/80 truncate'>{selectedApplicant.jobId.title}</p>
-                <button
-                    type='button'
-                    className='mt-3 text-xs text-white/90 underline'
-                    onClick={() => setSelectedId(null)}
-                >
-                    Close panel
-                </button>
+        <aside className='w-full xl:w-[400px] shrink-0 border border-gray-200 rounded-2xl bg-white shadow-xl overflow-hidden flex flex-col max-h-[calc(100vh-160px)] animate-slide-in'>
+            <div className='p-5 border-b bg-gradient-to-br from-slate-900 to-indigo-900 text-white'>
+                <div className='flex justify-between items-start'>
+                    <div>
+                        <p className='text-[10px] uppercase tracking-widest text-white/60 font-bold'>Team Hiring Room</p>
+                        <p className='font-bold text-xl truncate mt-0.5'>{selectedApplicant.userId.name}</p>
+                        <p className='text-sm text-white/70 truncate'>{selectedApplicant.jobId.title}</p>
+                    </div>
+                    <button
+                        type='button'
+                        className='text-white/50 hover:text-white transition-colors'
+                        onClick={() => setSelectedId(null)}
+                    >
+                        ✕
+                    </button>
+                </div>
+                <div className='mt-4 flex gap-2'>
+                    <Link
+                        to={`/dashboard/messages/${selectedApplicant._id}`}
+                        className='flex-1 text-center bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs font-bold py-2 rounded-lg transition-all border border-white/10'
+                    >
+                        Chat
+                    </Link>
+                    <button
+                        type='button'
+                        onClick={() => window.open(selectedApplicant.userId.resume, '_blank')}
+                        className='flex-1 bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-all'
+                    >
+                        Resume
+                    </button>
+                </div>
             </div>
-            <div className='flex-1 overflow-y-auto p-4 flex flex-col gap-4'>
+            
+            <div className='flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide'>
+                {renderSummary()}
+
                 <div>
-                    <p className='text-xs font-semibold text-gray-500 uppercase mb-2'>Live feedback</p>
-                    <div className='space-y-3'>
+                    <div className='flex justify-between items-center mb-3'>
+                        <p className='text-xs font-bold text-slate-400 uppercase tracking-widest'>Team Notes</p>
+                        <span className='text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold'>Internal</span>
+                    </div>
+                    <div className='space-y-4'>
                         {(selectedApplicant.internalNotes || []).length === 0 && (
-                            <p className='text-sm text-gray-400 italic'>No notes yet — add the first rating for your team.</p>
+                            <div className='py-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200'>
+                                <p className='text-xs text-slate-400 italic'>No feedback shared yet.</p>
+                            </div>
                         )}
                         {[...(selectedApplicant.internalNotes || [])].reverse().map((n) => (
-                            <div key={n._id} className='rounded-xl border border-gray-100 bg-gray-50 p-3'>
+                            <div key={n._id} className='rounded-xl border border-slate-100 bg-slate-50/50 p-3 shadow-sm'>
                                 <div className='flex justify-between items-start gap-2'>
-                                    <span className='text-sm font-medium text-gray-900'>{n.authorName}</span>
+                                    <span className='text-sm font-bold text-slate-800'>{n.authorName}</span>
                                     {n.rating ? (
-                                        <span className='text-amber-500 text-sm shrink-0'>{'★'.repeat(n.rating)}{'☆'.repeat(5 - n.rating)}</span>
+                                        <span className='text-amber-500 text-xs shrink-0'>{'★'.repeat(n.rating)}</span>
                                     ) : null}
                                 </div>
-                                <p className='text-sm text-gray-700 mt-2 whitespace-pre-wrap'>{n.body}</p>
-                                <p className='text-[10px] text-gray-400 mt-2'>
-                                    {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}
+                                <p className='text-sm text-slate-600 mt-2 leading-relaxed'>{n.body}</p>
+                                <p className='text-[9px] text-slate-400 mt-2 uppercase font-bold tracking-tight'>
+                                    {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}
                                 </p>
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className='border-t pt-4'>
-                    <p className='text-xs font-semibold text-gray-500 uppercase mb-2'>Add note</p>
-                    <label className='block text-xs text-gray-500 mb-1'>Rating</label>
-                    <select
-                        value={noteRating}
-                        onChange={(e) => setNoteRating(Number(e.target.value))}
-                        className='w-full border rounded-lg px-2 py-2 text-sm mb-2'
-                    >
-                        {[5, 4, 3, 2, 1].map((r) => (
-                            <option key={r} value={r}>{r} stars</option>
-                        ))}
-                    </select>
-                    <textarea
-                        value={noteBody}
-                        onChange={(e) => setNoteBody(e.target.value)}
-                        placeholder='Internal note — invisible to candidate…'
-                        rows={4}
-                        className='w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none'
-                    />
-                    <button
-                        type='button'
-                        disabled={savingNote}
-                        onClick={submitInternalNote}
-                        className='mt-2 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50'
-                    >
-                        {savingNote ? 'Saving…' : 'Publish to team'}
-                    </button>
+
+                <div className='border-t border-slate-100 pt-5'>
+                    <p className='text-xs font-bold text-slate-400 uppercase tracking-widest mb-3'>Post Feedback</p>
+                    <div className='bg-slate-50 p-4 rounded-2xl border border-slate-200'>
+                        <div className='flex items-center gap-3 mb-3'>
+                            <label className='text-xs font-bold text-slate-500'>Score</label>
+                            <div className='flex gap-1'>
+                                {[1, 2, 3, 4, 5].map((r) => (
+                                    <button
+                                        key={r}
+                                        type='button'
+                                        onClick={() => setNoteRating(r)}
+                                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${noteRating === r ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:border-indigo-300'}`}
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <textarea
+                            value={noteBody}
+                            onChange={(e) => setNoteBody(e.target.value)}
+                            placeholder='Team feedback…'
+                            rows={3}
+                            className='w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all'
+                        />
+                        <button
+                            type='button'
+                            disabled={savingNote || !noteBody.trim()}
+                            onClick={submitInternalNote}
+                            className='mt-3 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200'
+                        >
+                            {savingNote ? 'Publishing…' : 'Share with team'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>

@@ -6,7 +6,6 @@ import {
     updateUserResume,
     getResumeSignedUrl,
     getRealtimeToken,
-    optimizeResume,
 } from '../controllers/userController.js'
 import {
     getUserUnreadCount,
@@ -17,6 +16,8 @@ import {
 import upload from '../config/multer.js'
 import { protectUser } from '../middleware/authMiddleware.js'
 import { rateLimit } from 'express-rate-limit'
+import validate from '../middleware/validationMiddleware.js'
+import schemas from '../utils/validators.js'
 
 const router = express.Router()
 
@@ -27,14 +28,11 @@ const applyLimiter = rateLimit({
     message: { success: false, message: 'Too many applications sent, please try again later.' },
 })
 
-// All routes require a valid Clerk session (protectUser middleware)
 /**
  * @swagger
  * /api/users/user:
  *   get:
  *     summary: Get logged-in user profile
- *     tags: [User]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/user', protectUser, getUserData)
 
@@ -43,8 +41,6 @@ router.get('/user', protectUser, getUserData)
  * /api/users/realtime-token:
  *   get:
  *     summary: Get token for real-time messaging
- *     tags: [Messaging]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/realtime-token', protectUser, getRealtimeToken)
 
@@ -53,26 +49,14 @@ router.get('/realtime-token', protectUser, getRealtimeToken)
  * /api/users/apply:
  *   post:
  *     summary: Apply for a job
- *     tags: [User]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               jobId: { type: string }
  */
-router.post('/apply', protectUser, applyLimiter, applyForJob)
+router.post('/apply', protectUser, applyLimiter, validate(schemas.applyJob), applyForJob)
 
 /**
  * @swagger
  * /api/users/applications:
  *   get:
  *     summary: Get list of user applications
- *     tags: [User]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/applications', protectUser, getUserJobApplications)
 
@@ -81,14 +65,6 @@ router.get('/applications', protectUser, getUserJobApplications)
  * /api/users/update-resume:
  *   post:
  *     summary: Update candidate resume
- *     tags: [User]
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               resume: { type: string, format: binary }
  */
 router.post('/update-resume', protectUser, upload.single('resume'), updateUserResume)
 
@@ -97,33 +73,14 @@ router.post('/update-resume', protectUser, upload.single('resume'), updateUserRe
  * /api/users/resume:
  *   get:
  *     summary: Get signed URL for user resume
- *     tags: [User]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/resume', protectUser, getResumeSignedUrl)
-
-/**
- * @swagger
- * /api/users/optimize-resume/{jobId}:
- *   get:
- *     summary: AI Resume Optimization suggestions
- *     tags: [AI]
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: jobId
- *         required: true
- *         schema: { type: string }
- */
-router.get('/optimize-resume/:jobId', protectUser, optimizeResume)
 
 /**
  * @swagger
  * /api/users/messages/unread-count:
  *   get:
  *     summary: Get count of unread messages for the user
- *     tags: [Messaging]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/messages/unread-count', protectUser, getUserUnreadCount)
 
@@ -132,8 +89,6 @@ router.get('/messages/unread-count', protectUser, getUserUnreadCount)
  * /api/users/messages/threads:
  *   get:
  *     summary: List all active message threads for the user
- *     tags: [Messaging]
- *     security: [{ bearerAuth: [] }]
  */
 router.get('/messages/threads', protectUser, listUserThreads)
 
@@ -142,13 +97,6 @@ router.get('/messages/threads', protectUser, listUserThreads)
  * /api/users/messages/thread/{applicationId}:
  *   get:
  *     summary: Get all messages in a specific thread
- *     tags: [Messaging]
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: applicationId
- *         required: true
- *         schema: { type: string }
  */
 router.get('/messages/thread/:applicationId', protectUser, getUserThread)
 
@@ -157,18 +105,7 @@ router.get('/messages/thread/:applicationId', protectUser, getUserThread)
  * /api/users/messages:
  *   post:
  *     summary: Send a message in an application thread
- *     tags: [Messaging]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               applicationId: { type: string }
- *               content: { type: string }
  */
-router.post('/messages', protectUser, postUserMessage)
+router.post('/messages', protectUser, validate(schemas.sendMessage), postUserMessage)
 
 export default router

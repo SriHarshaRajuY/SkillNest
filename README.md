@@ -1,56 +1,64 @@
-# 🚀 SkillNest: AI-Powered Recruitment Ecosystem
+# SkillNest: AI-Assisted Recruitment Platform
 
-SkillNest is a professional-grade MERN (MongoDB, Express, React, Node) platform designed to revolutionize the recruitment process through ethically-trained AI, real-time communication, and enterprise-level architecture.
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
-![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)
-![Ethics](https://img.shields.io/badge/AI-Ethical%20Audit-indigo.svg)
+SkillNest is a full-stack MERN platform built with a focus on robust backend engineering, clean architecture, and realistic recruitment workflows. It leverages Google Gemini AI for resume matching and real-time communication via Socket.io, providing a polished and scalable foundation for internship/SDE candidate evaluation.
 
 ---
 
-## ✨ Key Features
+## 🛠 Core Features
 
-### 🧠 Intelligent Recruiting
-- **AI Resume Matcher**: Leverages Google Gemini AI to analyze candidate resumes against job descriptions, providing an objective "Fit Score."
-- **DEI Job Audit**: Automatically audits job descriptions for biased language to ensure inclusive recruiting practices.
-- **AI Resume Optimizer**: Empowers candidates with actionable suggestions to improve their ATS scores.
+### 🧠 AI Integration (Gemini AI)
+- **Automated Resume Matching**: Analyzes candidate resumes against job descriptions using Google Gemini Pro, generating a match score and technical reasoning.
+- **Reliability Layer**: Implemented timeout handling, defensive JSON parsing, and exponential backoff retries to ensure AI service stability.
+- **Redis Caching**: Frequently accessed match results are cached in Redis to reduce LLM latency and API costs.
 
-### 🛠 Recruiter Dashboard
-- **Kanban Board**: Drag-and-drop interface for managing candidate pipelines (Applied -> Shortlisted -> Interview -> Hired/Rejected).
-- **Real-time Messaging**: Instant recruiter-candidate communication powered by Socket.io.
-- **Application Analytics**: Visual tracking of application trends and candidate demographics.
+### 📊 Recruiter Pipeline Management
+- **Workflow Management**: Real-time pipeline updates (Applied, Screening, Interview, Offer, Rejected) with automatic candidate notification.
+- **Internal Notes**: Recruiters can add private feedback and ratings to applications, synced in real-time across the hiring team.
+- **Job Lifecycle**: Full control over job posting, visibility toggling, and applicant tracking.
 
-### ⚡ Performance & Scale
-- **Redis Caching**: Optimized AI response times and reduced API costs by caching match results via Upstash Redis.
-- **Cloudinary Integration**: Secure, time-limited signed URLs for viewing candidate resumes without exposing raw data.
-- **Rate Limiting**: Protected authentication and application routes using `express-rate-limit`.
+### 💬 Real-time Messaging
+- **Instant Communication**: Socket.io-based chat between recruiters and candidates.
+- **Room Isolation**: Strict authorization-based room joining to ensure data privacy.
+- **Unread Sync**: Real-time unread message counters for both candidates and recruiters.
 
 ---
 
 ## 🏗 System Architecture
 
-SkillNest follows a modular architecture designed for high availability and security.
+SkillNest is built as a modular monolith, prioritizing simplicity and maintainability over overengineered microservices.
 
 ```mermaid
 graph TD
     User((User/Recruiter)) -->|React + Vite| Frontend[Frontend UI]
-    Frontend -->|JWT Auth| Backend[Express API]
-    Backend -->|Queries| MongoDB[(MongoDB Atlas)]
-    Backend -->|Cache| Redis[(Upstash Redis)]
-    Backend -->|Analysis| Gemini[Gemini AI]
-    Backend -->|Storage| Cloudinary[Cloudinary]
+    Frontend -->|JWT/Clerk| Backend[Express API]
+    Backend -->|Aggregation| MongoDB[(MongoDB Atlas)]
+    Backend -->|Caching| Redis[(Redis)]
+    Backend -->|NLP| Gemini[Gemini AI]
+    Backend -->|Assets| Cloudinary[Cloudinary]
     Backend -->|Realtime| Socket[Socket.io Hub]
 ```
 
 ---
 
-## 🛠 Tech Stack
+## ⚡ Technical Highlights
 
-- **Frontend**: React 18, Vite, Tailwind CSS, Clerk (Auth), Socket.io Client.
-- **Backend**: Node.js, Express, Mongoose, Socket.io, Morgan (Logging), Helmet (Security).
-- **Services**: Google Gemini AI (NLP), Cloudinary (Asset Mgmt), Upstash (Redis).
-- **DevOps**: Docker, Docker-Compose, Jest + Supertest (Testing).
+- **Database Optimization**: Implemented compound indexing and `.lean()` queries to ensure sub-100ms response times for data-heavy listing operations.
+- **Validation Layer**: Centralized request validation using **Joi**, ensuring data integrity and sanitization across all API boundaries.
+- **Structured Logging**: Replaced scattered console logs with a centralized, level-based logger for better observability.
+- **Security**: 
+  - **Clerk Auth**: Secure candidate authentication.
+  - **JWT Auth**: Independent recruiter authentication.
+  - **Signed URLs**: Resumes are served via time-limited Cloudinary signed URLs.
+- **Pagination & Filtering**: Efficient server-side pagination and complex filtering for jobs and applications.
+
+---
+
+## 🚀 Tech Stack
+
+- **Frontend**: React 18, Vite, Tailwind CSS, Clerk (User Auth), Socket.io Client.
+- **Backend**: Node.js, Express, Mongoose, Socket.io, Joi (Validation), Winston (Logging).
+- **Services**: Google Gemini AI, Cloudinary (Storage), Upstash/Redis (Cache).
+- **Testing**: Jest + Supertest (Integration), Vitest (UI).
 
 ---
 
@@ -59,10 +67,10 @@ graph TD
 ### Prerequisites
 - Node.js (v18+)
 - MongoDB Atlas Account
-- Clerk API Keys
+- Clerk Account (Frontend Auth)
 - Gemini AI API Key
 - Cloudinary Account
-- Upstash Redis URL
+- Redis Instance (Local or Upstash)
 
 ### Installation
 
@@ -72,93 +80,40 @@ graph TD
    cd SkillNest
    ```
 
-2. **Configure Environment Variables**
-   Create a `.env` file in the `server/` directory:
+2. **Backend Configuration**
+   In `server/.env`:
    ```env
-   MONGODB_URI=your_mongodb_uri
-   JWT_SECRET=your_secret
-   CLOUDINARY_NAME=...
+   MONGODB_URI=...
+   JWT_SECRET=...
    GEMINI_API_KEY=...
    REDIS_URL=...
+   CLOUDINARY_URL=...
    ```
 
-3. **Install Dependencies**
+3. **Frontend Configuration**
+   In `client/.env`:
+   ```env
+   VITE_CLERK_PUBLISHABLE_KEY=...
+   VITE_BACKEND_URL=http://localhost:5000
+   ```
+
+4. **Run the Project**
    ```bash
-   # Root level
-   npm run setup # If setup script is configured, or:
-   cd server && npm install
-   cd ../client && npm install
-   ```
+   # Terminal 1: Backend
+   cd server && npm install && npm run dev
 
-4. **Run Locally**
-   ```bash
-   # Server (Port 5000)
-   cd server
-   npm run dev
-
-   # Client (Port 5173)
-   cd client
-   npm run dev
+   # Terminal 2: Frontend
+   cd client && npm install && npm run dev
    ```
 
 ---
 
-## 🐳 Docker Deployment
+## 🧪 Quality Assurance
 
-SkillNest is container-ready. Launch the entire ecosystem (Client, Server) with a single command:
-
-```bash
-docker-compose up --build
-```
-
----
-
-## 🧪 Testing & Quality Assurance
-
-SkillNest is built with a "Test-First" mentality, featuring over 100% coverage of critical business logic.
-
-### 🖥️ Backend (Jest + Supertest)
-- **AI Match Pipeline**: Verified integration tests with mocked Gemini and Redis layers.
-- **Real-time Hub**: Validated Socket.io room logic and connection stability.
-- **Run Tests**: `cd server && npm test`
-
-### ⚛️ Frontend (Vitest + React Testing Library)
-- **Component Integrity**: Automated UI testing for core components like `JobCard`.
-- **Session Logic**: Verified token handling and auto-logout scenarios.
-- **Run Tests**: `cd client && npm test`
-
----
-
-## 📖 API Documentation
-
-SkillNest uses **Swagger (OpenAPI 3.0)** to provide interactive, professional documentation for every endpoint.
-- **Access URL**: `http://localhost:5000/api-docs`
-- **Coverage**: 100% (Auth, Company, User, AI, Messaging).
-
----
-
-## 🛡️ Enterprise Security & Performance
-
-- **Multi-Layer Validation**: Field-specific Multer filters (PDF-only for resumes, Image-only for logos).
-- **Session Management**: Automated 401 Unauthorized handling with client-side state cleanup.
-- **Distributed Caching**: Upstash Redis integration for reducing LLM latency and cloud costs.
-- **Secure File Handling**: Cloudinary Signed URLs for time-limited, private resume viewing.
-
-> [!CAUTION]
-> **Security Alert**: If you have accidentally committed `.env` files or secrets to your Git history, rotate your API keys immediately. Use `git filter-repo` or BFG Repo-Cleaner to purge secrets from your history before pushing to a public repository.
-
----
-
-## 🤖 CI/CD Automation
-
-SkillNest is configured with **GitHub Actions** to ensure code quality on every push.
-- **Workflow**: `.github/workflows/main.yml`
-- **Checks**: Linting (ESLint), Testing (Vitest/Jest), and Build verification.
+- **Integration Tests**: `cd server && npm test` (Covers AI flow, Authentication, and Database operations).
+- **Frontend Tests**: `cd client && npm test` (Covers UI component integrity).
 
 ---
 
 ## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-*Built with ❤️ for the future of recruitment.*
+Distributed under the MIT License.

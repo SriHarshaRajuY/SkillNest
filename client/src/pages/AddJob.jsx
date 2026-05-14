@@ -1,9 +1,9 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import Quill from 'quill'
 import { JobCategories, JobLocations } from '../assets/assets';
-import axios from 'axios';
 import { AppContext } from '../context/AppContext';
 import { toast } from 'react-toastify';
+import { recruiterService } from '../services/recruiterService';
 
 const AddJob = () => {
 
@@ -13,14 +13,11 @@ const AddJob = () => {
     const [level, setLevel] = useState('Beginner level');
     const [salary, setSalary] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [isAuditing, setIsAuditing] = useState(false);
-    const [auditScore, setAuditScore] = useState(null);
-    const [auditSuggestions, setAuditSuggestions] = useState([]);
 
     const editorRef = useRef(null)
     const quillRef = useRef(null)
 
-    const { backendUrl, companyToken } = useContext(AppContext)
+    const { companyToken } = useContext(AppContext)
 
     const onSubmitHandler = async (e) => {
         e.preventDefault()
@@ -41,53 +38,29 @@ const AddJob = () => {
         try {
             setIsSubmitting(true)
 
-            const { data } = await axios.post(backendUrl + '/api/company/post-job',
-                { title: title.trim(), description, location, salary: Number(salary), category, level },
-                { headers: { token: companyToken } }
-            )
+            // Using recruiterService for standardized API calls
+            const response = await recruiterService.postJob({ 
+                title: title.trim(), 
+                description, 
+                location, 
+                salary: Number(salary), 
+                category, 
+                level 
+            })
 
-            if (data.success) {
+            if (response.success) {
                 toast.success('Job posted successfully!')
                 setTitle('')
                 setSalary('')
                 quillRef.current.root.innerHTML = ''
-                setAuditScore(null)
-                setAuditSuggestions([])
             } else {
-                toast.error(data.message)
+                toast.error(response.message)
             }
 
         } catch (error) {
-            toast.error(error.message)
+            toast.error(error.message || 'Failed to post job')
         } finally {
             setIsSubmitting(false)
-        }
-    }
-
-    const runDiversityAudit = async () => {
-        const description = quillRef.current.root.innerHTML.trim();
-        if (!description || description === '<p><br></p>') {
-            return toast.error('Please enter a job description to audit');
-        }
-
-        try {
-            setIsAuditing(true);
-            const { data } = await axios.post(backendUrl + '/api/company/audit-job', 
-                { description },
-                { headers: { token: companyToken } }
-            );
-
-            if (data.success) {
-                setAuditScore(data.audit.score);
-                setAuditSuggestions(data.audit.suggestions);
-                toast.success('Diversity audit complete!');
-            } else {
-                toast.error(data.message);
-            }
-        } catch (error) {
-            toast.error(error.message);
-        } finally {
-            setIsAuditing(false);
         }
     }
 
@@ -101,7 +74,7 @@ const AddJob = () => {
     }, [])
 
     return (
-        <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-4 max-w-3xl'>
+        <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-4 max-w-3xl animate-fade-in'>
             <h2 className='text-xl font-semibold text-gray-800'>Post a New Job</h2>
 
             {/* Job Title */}
@@ -118,36 +91,8 @@ const AddJob = () => {
 
             {/* Job Description */}
             <div className='w-full max-w-lg'>
-                <div className='flex justify-between items-end mb-1'>
-                    <label className='block text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
-                    <button 
-                        type='button' 
-                        onClick={runDiversityAudit}
-                        disabled={isAuditing}
-                        className='text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-3 py-1 rounded-full font-medium transition-colors disabled:opacity-50'
-                    >
-                        {isAuditing ? 'Auditing...' : '✨ Run AI Diversity Audit'}
-                    </button>
-                </div>
+                <label className='block mb-2 text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
                 <div ref={editorRef} className='min-h-[150px]' />
-
-                {auditScore !== null && (
-                    <div className='mt-3 p-4 bg-purple-50 rounded-lg border border-purple-100'>
-                        <div className='flex items-center gap-2 mb-2'>
-                            <span className='font-semibold text-purple-800'>Diversity Score:</span>
-                            <span className={`font-bold px-2 py-0.5 rounded ${auditScore >= 80 ? 'bg-green-100 text-green-700' : auditScore >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                                {auditScore}/100
-                            </span>
-                        </div>
-                        {auditSuggestions.length > 0 ? (
-                            <ul className='list-disc pl-5 space-y-1 text-sm text-purple-900'>
-                                {auditSuggestions.map((s, i) => <li key={i}>{s}</li>)}
-                            </ul>
-                        ) : (
-                            <p className='text-sm text-green-700 font-medium'>Great job! This description looks very inclusive.</p>
-                        )}
-                    </div>
-                )}
             </div>
 
             {/* Category / Location / Level */}
@@ -209,9 +154,9 @@ const AddJob = () => {
             <button
                 type='submit'
                 disabled={isSubmitting}
-                className={`px-8 py-3 mt-2 rounded-lg text-white font-medium transition-colors ${isSubmitting
+                className={`px-8 py-3 mt-2 rounded-lg text-white font-medium transition-all shadow-md ${isSubmitting
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 cursor-pointer'}`}
+                    : 'bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'}`}
             >
                 {isSubmitting ? 'Posting...' : 'Post Job'}
             </button>

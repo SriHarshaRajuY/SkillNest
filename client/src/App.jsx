@@ -12,6 +12,7 @@ import ViewApplications from './pages/ViewApplications'
 import NotFound from './pages/NotFound'
 import CandidateMessages from './pages/CandidateMessages'
 import RecruiterMessages from './pages/RecruiterMessages'
+import Analytics from './pages/Analytics'
 import ProtectedRecruiterRoute from './components/ProtectedRecruiterRoute'
 import 'quill/dist/quill.snow.css'
 import { ToastContainer } from 'react-toastify'
@@ -28,27 +29,28 @@ const App = () => {
             <ToastContainer position='top-right' autoClose={3500} closeOnClick />
             <ErrorBoundary>
                 <Routes>
-                <Route path='/' element={<Home />} />
-                <Route path='/apply-job/:id' element={<ApplyJob />} />
-                <Route path='/applications' element={<Applications />} />
-                <Route path='/messages' element={<CandidateMessages />} />
-                <Route path='/messages/:applicationId' element={<CandidateMessages />} />
-                <Route
-                    path='/dashboard'
-                    element={
-                        <ProtectedRecruiterRoute>
-                            <Dashboard />
-                        </ProtectedRecruiterRoute>
-                    }
-                >
-                    <Route path='add-job' element={<AddJob />} />
-                    <Route path='manage-jobs' element={<ManageJobs />} />
-                    <Route path='view-applications' element={<ViewApplications />} />
-                    <Route path='messages' element={<RecruiterMessages />} />
-                    <Route path='messages/:applicationId' element={<RecruiterMessages />} />
-                </Route>
-                <Route path='*' element={<NotFound />} />
-            </Routes>
+                    <Route path='/' element={<Home />} />
+                    <Route path='/apply-job/:id' element={<ApplyJob />} />
+                    <Route path='/applications' element={<Applications />} />
+                    <Route path='/messages' element={<CandidateMessages />} />
+                    <Route path='/messages/:applicationId' element={<CandidateMessages />} />
+                    <Route
+                        path='/dashboard'
+                        element={
+                            <ProtectedRecruiterRoute>
+                                <Dashboard />
+                            </ProtectedRecruiterRoute>
+                        }
+                    >
+                        <Route path='add-job' element={<AddJob />} />
+                        <Route path='manage-jobs' element={<ManageJobs />} />
+                        <Route path='view-applications' element={<ViewApplications />} />
+                        <Route path='messages' element={<RecruiterMessages />} />
+                        <Route path='messages/:applicationId' element={<RecruiterMessages />} />
+                        <Route path='analytics' element={<Analytics />} />
+                    </Route>
+                    <Route path='*' element={<NotFound />} />
+                </Routes>
             </ErrorBoundary>
         </div>
     )

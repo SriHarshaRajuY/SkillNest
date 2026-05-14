@@ -1,4 +1,4 @@
-﻿import request from 'supertest'
+import request from 'supertest'
 import { jest } from '@jest/globals'
 import mongoose from 'mongoose'
 import { MongoMemoryServer } from 'mongodb-memory-server'
@@ -18,16 +18,17 @@ jest.unstable_mockModule('../services/aiService.js', () => ({
     generateMatchScore: jest.fn(() =>
       Promise.resolve({ score: 82, reason: 'Strong React/Node match. Missing Docker.' })
     ),
-    auditJobDescription: jest.fn(() => Promise.resolve({ bias: 'low', suggestions: [] }))
   }
 }))
 
 const mockCacheGet = jest.fn(() => Promise.resolve(null))
 const mockCacheSet = jest.fn(() => Promise.resolve())
+const mockCacheDel = jest.fn(() => Promise.resolve())
 
 jest.unstable_mockModule('../utils/redisClient.js', () => ({
   cacheGet: mockCacheGet,
-  cacheSet: mockCacheSet
+  cacheSet: mockCacheSet,
+  cacheDel: mockCacheDel
 }))
 
 jest.unstable_mockModule('@clerk/express', () => ({

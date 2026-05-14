@@ -41,8 +41,7 @@ const jobApplicationSchema = new mongoose.Schema({
     date: { type: Number, required: true },
 
     // Advanced Evaluation metrics
-    matchScore: { type: Number, default: 0 },
-    assessmentScore: { type: Number, default: 0 }
+    matchScore: { type: Number, default: 0 }
 }, { timestamps: true })
 
 jobApplicationSchema.pre('save', function (next) {
