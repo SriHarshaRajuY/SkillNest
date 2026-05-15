@@ -15,10 +15,7 @@ export default function MessageChatPanel({
     peerLabel,
     peerImage,
     draftRole, // 'user' or 'company'
-    onDraft,
-    loadingDraft,
-    aiDraftTrigger = 0,
-    aiDraftBody = '',
+    onThreadRead,
 }) {
     const [messages, setMessages] = useState([])
     const [meta, setMeta] = useState(null)
@@ -29,6 +26,29 @@ export default function MessageChatPanel({
     const bottomRef = useRef(null)
 
     const isCompany = draftRole === 'company'
+
+    const notifyThreadRead = useCallback(() => {
+        if (!applicationId) return
+        onThreadRead?.(applicationId)
+        if (!isCompany) {
+            window.dispatchEvent(new CustomEvent('skillnest:messages-read'))
+        }
+    }, [applicationId, isCompany, onThreadRead])
+
+    const markThreadRead = useCallback(async () => {
+        if (!applicationId) return
+        try {
+            if (isCompany) {
+                await messageService.markRecruiterThreadRead(applicationId)
+            } else if (clerkToken) {
+                await messageService.markUserThreadRead(applicationId, clerkToken)
+            }
+        } catch (error) {
+            console.error('[MessageChatPanel] Failed to mark thread read', error)
+        } finally {
+            notifyThreadRead()
+        }
+    }, [applicationId, clerkToken, isCompany, notifyThreadRead])
 
     // ─── Data Loading ────────────────────────────────────────────────────────
     const load = useCallback(async () => {
@@ -42,22 +62,18 @@ export default function MessageChatPanel({
             if (response.success) {
                 setMessages(response.data.messages || [])
                 setMeta(response.data.application || null)
+                notifyThreadRead()
             }
         } catch (e) {
             toast.error(e.message || 'Failed to load chat')
         } finally {
             setLoading(false)
         }
-    }, [applicationId, isCompany, clerkToken])
+    }, [applicationId, isCompany, clerkToken, notifyThreadRead])
 
     useEffect(() => {
         load()
     }, [load])
-
-    useEffect(() => {
-        if (!aiDraftTrigger || !aiDraftBody) return
-        setText(aiDraftBody.trim())
-    }, [aiDraftTrigger, aiDraftBody])
 
     // ─── Socket Integration ──────────────────────────────────────────────────
     const socketAuthToken = isCompany ? localStorage.getItem('companyToken') : clerkToken
@@ -73,6 +89,10 @@ export default function MessageChatPanel({
                     if (prev.some((m) => String(m._id) === String(message._id))) return prev
                     return [...prev, message]
                 })
+                const isMine = isCompany ? !message.fromUser : message.fromUser
+                if (!isMine) {
+                    markThreadRead()
+                }
                 setIsPeerTyping(false)
             },
             'typing:start': (payload) => {
@@ -147,7 +167,7 @@ export default function MessageChatPanel({
     if (!applicationId) {
         return (
             <div className='flex flex-col items-center justify-center h-[50vh] text-slate-500 text-sm'>
-                <span className="text-4xl mb-4">💬</span>
+                <span className="text-4xl mb-4">Messages</span>
                 Select a conversation to view secure messages.
             </div>
         )
@@ -181,22 +201,12 @@ export default function MessageChatPanel({
                         <p className='text-xs text-slate-500 truncate'>Re: {meta.jobTitle}</p>
                     )}
                 </div>
-                {isCompany && onDraft && (
-                    <button
-                        type='button'
-                        onClick={onDraft}
-                        disabled={loadingDraft}
-                        className='text-xs font-semibold px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm hover:opacity-95 disabled:opacity-50 shrink-0 transition-all hover:scale-105'
-                    >
-                        {loadingDraft ? 'Drafting…' : 'AI smart draft'}
-                    </button>
-                )}
             </header>
 
             <div className='flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[url("https://www.transparenttextures.com/patterns/cubes.png")] bg-fixed'>
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 opacity-40">
-                        <span className="text-3xl mb-2">👋</span>
+                        <span className="text-3xl mb-2">Ready</span>
                         <p className='text-sm text-slate-600'>Start the conversation</p>
                     </div>
                 )}
@@ -214,7 +224,7 @@ export default function MessageChatPanel({
                                     <p className={`text-[10px] opacity-70 ${isMine ? 'text-indigo-100' : 'text-slate-400'}`}>
                                         {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </p>
-                                    {isMine && !m.isOptimistic && <span className="text-[10px] text-indigo-200">✓</span>}
+                                    {isMine && !m.isOptimistic && <span className="text-[10px] text-indigo-200">sent</span>}
                                 </div>
                             </div>
                         </div>
@@ -239,7 +249,7 @@ export default function MessageChatPanel({
             <footer className='p-4 bg-white border-t border-slate-200'>
                 {meta && !['Screening', 'Interview', 'Offer', 'Hired'].includes(meta.pipelineStage) ? (
                     <div className='text-center py-3 text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300'>
-                        🔒 Messaging restricted. {isCompany ? 'Shortlist the candidate' : 'Wait for shortlisting'} to enable chat.
+                        Messaging restricted. {isCompany ? 'Shortlist the candidate' : 'Wait for shortlisting'} to enable chat.
                     </div>
                 ) : (
                     <div className='flex gap-3 items-end'>
@@ -247,7 +257,7 @@ export default function MessageChatPanel({
                             <textarea
                                 value={text}
                                 onChange={handleTyping}
-                                placeholder='Write a secure message…'
+                                placeholder='Write a secure message...'
                                 rows={1}
                                 className='w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all pr-12 scrollbar-hide'
                                 onKeyDown={(e) => {
@@ -265,7 +275,7 @@ export default function MessageChatPanel({
                             disabled={!text.trim()}
                             className='shrink-0 w-12 h-12 flex items-center justify-center rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:grayscale'
                         >
-                            <svg viewBox="0 0 24 24" className="w-6 h-6 rotate-45" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                                 <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                         </button>

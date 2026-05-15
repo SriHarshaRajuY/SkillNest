@@ -8,10 +8,11 @@ import { processApplication } from '../services/applicationService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
 import logger from '../utils/logger.js'
 import config from '../config/env.js'
+import { getClerkAuth } from '../middleware/authMiddleware.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const getUserId = (req) => req.auth?.userId
+const getUserId = (req) => getClerkAuth(req)?.userId
 const RESUME_LINK_TTL_SECONDS = 3600
 
 const normalizeResumeAsset = (asset) => {
@@ -112,19 +113,46 @@ const destroyStoredResume = async (resumeSource) => {
     })
 }
 
-const getOrCreateUser = async (userId) => {
+const userProfileFromClaims = (auth) => {
+    const claims = auth?.sessionClaims || {}
+    const email = claims.email || claims.email_address || claims.primary_email_address || ''
+    const firstName = claims.first_name || claims.given_name || ''
+    const lastName = claims.last_name || claims.family_name || ''
+    const name = [firstName, lastName].filter(Boolean).join(' ') || claims.name || 'User'
+
+    return {
+        email: String(email).toLowerCase(),
+        name,
+        image: claims.picture || claims.image_url || '',
+    }
+}
+
+const getOrCreateUser = async (req) => {
+    const auth = getClerkAuth(req)
+    const userId = auth?.userId
     let user = await User.findById(userId)
     if (user) return user
 
-    const clerkUser = await clerkClient.users.getUser(userId)
-    const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || 'User'
+    let profile = userProfileFromClaims(auth)
+    if (!profile.email) {
+        const clerkUser = await clerkClient.users.getUser(userId)
+        profile = {
+            email: clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || '',
+            name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || 'User',
+            image: clerkUser.imageUrl || '',
+        }
+    }
+
+    if (!profile.email) {
+        throw new Error('Could not resolve Clerk user email')
+    }
 
     try {
         user = await User.create({
             _id: userId,
-            email: clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || '',
-            name,
-            image: clerkUser.imageUrl || '',
+            email: profile.email,
+            name: profile.name,
+            image: profile.image,
             resume: '',
             resumeAsset: null,
         })
@@ -142,7 +170,12 @@ export const getSignedResumeUrl = (resumeSource) => {
     const { resumeUrl } = getResumeSource(resumeSource)
     if (!resumeUrl) return null
     if (!resumeUrl.includes('cloudinary.com')) return resumeUrl
-    return getResumeAssetUrl(getStoredResumeAsset(resumeSource)) || resumeUrl
+    try {
+        return getResumeAssetUrl(getStoredResumeAsset(resumeSource)) || resumeUrl
+    } catch (error) {
+        logger.warn('[getSignedResumeUrl] Falling back to stored resume URL', { error: error.message })
+        return resumeUrl
+    }
 }
 
 export const fetchResumeBuffer = async (resumeSource, { timeoutMs = 10000 } = {}) => {
@@ -194,7 +227,7 @@ export const getRealtimeToken = asyncHandler(async (req, res) => {
 // @route   GET /api/users/user
 // @access  Private (User)
 export const getUserData = asyncHandler(async (req, res) => {
-    const user = await getOrCreateUser(getUserId(req))
+    const user = await getOrCreateUser(req)
     if (!user) {
         res.status(404)
         throw new Error('User not found')
@@ -214,6 +247,7 @@ export const applyForJob = asyncHandler(async (req, res) => {
     const userId = getUserId(req)
     const { jobId } = req.body
 
+    await getOrCreateUser(req)
     await processApplication({
         userId,
         jobId
@@ -239,7 +273,7 @@ export const getUserJobApplications = asyncHandler(async (req, res) => {
 
     const totalResults = await JobApplication.countDocuments(filter)
     const applications = await JobApplication.find(filter)
-        .select('-internalNotes -pipelineHistory')
+        .select('-internalNotes')
         .populate('companyId', 'name image')
         .populate('jobId', 'title location category level salary')
         .sort({ date: -1 })
@@ -275,7 +309,7 @@ export const updateUserResume = asyncHandler(async (req, res) => {
     }
 
     try {
-        const user = await getOrCreateUser(userId)
+        const user = await getOrCreateUser(req)
         if (!user) {
             res.status(404)
             throw new Error('User not found')
@@ -316,12 +350,13 @@ export const getResumeSignedUrl = asyncHandler(async (req, res) => {
         res.status(404)
         throw new Error('No resume found')
     }
-    const exists = await verifyCloudinaryResumeAsset(user)
-    if (!exists) {
-        res.status(404)
-        throw new Error('Resume file not found in storage')
-    }
+
     const url = getSignedResumeUrl(user)
+    if (!url) {
+        res.status(404)
+        throw new Error('Resume file not found')
+    }
+
     res.json({ 
         success: true, 
         message: 'Signed URL generated',

@@ -13,7 +13,6 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.17.1",
     "@heroicons/react": "^2.2.0",
-    "@sentry/react": "^10.50.0",
     "axios": "^1.7.9",
     "k-convert": "^1.0.6",
     "moment": "^2.30.1",

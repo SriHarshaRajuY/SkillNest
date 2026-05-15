@@ -6,12 +6,13 @@ import moment from 'moment'
 import Footer from '../components/Footer'
 import { AppContext } from '../context/AppContext'
 import { useAuth, useUser } from '@clerk/clerk-react'
-import axios from 'axios'
 import { toast } from 'react-toastify'
 import Loading from '../components/Loading'
 import LivePipeline from '../components/LivePipeline'
 import { useSkillNestSocket } from '../hooks/useSkillNestSocket'
 import { PIPELINE_LABELS } from '../constants/pipeline'
+import { authService } from '../services/authService'
+import { applicationService } from '../services/applicationService'
 
 function displayPipelineStage(job) {
     if (job.pipelineStage) return job.pipelineStage
@@ -37,6 +38,7 @@ const Applications = () => {
         userDataLoaded,
         fetchUserData,
         setUserApplications,
+        apiOffline,
     } = useContext(AppContext)
 
     const applicationIds = useMemo(() => userApplications.map((j) => j._id), [userApplications])
@@ -48,10 +50,8 @@ const Applications = () => {
             try {
                 const token = await getToken()
                 if (!token || cancelled) return
-                const { data } = await axios.get(`${backendUrl}/api/users/realtime-token`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
-                if (!cancelled && data.success) setRealtimeToken(data.token)
+                const response = await authService.getRealtimeToken(token)
+                if (!cancelled && response.success) setRealtimeToken(response.data.token)
             } catch {
                 if (!cancelled) setRealtimeToken(null)
             }
@@ -87,17 +87,13 @@ const Applications = () => {
             formData.append('resume', resume)
 
             const token = await getToken()
-            const { data } = await axios.post(
-                backendUrl + '/api/users/update-resume',
-                formData,
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
+            const response = await applicationService.updateResume(formData, token)
 
-            if (data.success) {
-                toast.success(data.message)
+            if (response.success) {
+                toast.success(response.message)
                 await fetchUserData()
             } else {
-                toast.error(data.message)
+                toast.error(response.message)
             }
         } catch (error) {
             toast.error(error.message)
@@ -134,9 +130,15 @@ const Applications = () => {
             <>
                 <Navbar />
                 <div className='container px-4 min-h-[65vh] 2xl:px-20 mx-auto my-10 flex flex-col items-center justify-center text-center'>
-                    <div className='text-6xl mb-4'>⚠️</div>
-                    <h2 className='text-2xl font-semibold text-gray-700 mb-2'>Could not load your profile</h2>
-                    <p className='text-gray-500 mb-6 max-w-md'>There was an issue loading your profile. This can happen right after signing up. Please try again.</p>
+                    <div className='text-6xl mb-4'>!</div>
+                    <h2 className='text-2xl font-semibold text-gray-700 mb-2'>
+                        {apiOffline ? 'Backend API is offline' : 'Could not load your profile'}
+                    </h2>
+                    <p className='text-gray-500 mb-6 max-w-md'>
+                        {apiOffline
+                            ? 'Start the backend server on port 5000, then retry.'
+                            : 'There was an issue loading your profile. This can happen right after signing up. Please try again.'}
+                    </p>
                     <button
                         onClick={fetchUserData}
                         className='bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full transition-colors'
@@ -196,11 +198,7 @@ const Applications = () => {
                                 onClick={async () => {
                                     try {
                                         const token = await getToken()
-                                        const res = await fetch(`${backendUrl}/api/users/resume`, {
-                                            headers: { Authorization: `Bearer ${token}` }
-                                        })
-                                        const result = await res.json()
-                                        // result is { success, message, data: { url } }
+                                        const result = await applicationService.getResumeUrl(token)
                                         if (result.success && result.data?.url) {
                                             window.open(result.data.url, '_blank')
                                         } else {
@@ -229,7 +227,7 @@ const Applications = () => {
                 </p>
                 {userApplications.length === 0
                     ? <div className='text-center py-20 border rounded-lg bg-gray-50'>
-                        <div className='text-5xl mb-4'>📋</div>
+                        <div className='text-5xl mb-4'>No applications</div>
                         <p className='text-xl text-gray-600 font-medium'>No applications yet</p>
                         <p className='text-sm text-gray-400 mt-2'>Browse jobs and apply to get started!</p>
                     </div>
@@ -278,9 +276,9 @@ const Applications = () => {
                                             <td className='py-2 px-4 border-b align-middle'>
                                                 <Link
                                                     to={`/messages/${job._id}`}
-                                                    className='text-sm font-medium text-indigo-600 hover:text-indigo-800'
+                                                    className='inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100'
                                                 >
-                                                    Open chat
+                                                    Message
                                                 </Link>
                                             </td>
                                         </tr>

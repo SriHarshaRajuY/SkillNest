@@ -1,6 +1,5 @@
-import { useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'react-toastify'
 import MessageChatPanel from '../components/MessageChatPanel'
 import { AppContext } from '../context/AppContext'
 import Loading from '../components/Loading'
@@ -14,9 +13,6 @@ const RecruiterMessages = () => {
 
     const [threads, setThreads] = useState([])
     const [loading, setLoading] = useState(true)
-    const [loadingDraft, setLoadingDraft] = useState(false)
-    const [aiDraftTrigger, setAiDraftTrigger] = useState(0)
-    const [aiDraftBody, setAiDraftBody] = useState('')
 
     useEffect(() => {
         if (!companyToken) return
@@ -38,24 +34,13 @@ const RecruiterMessages = () => {
 
     const active = threads.find((t) => String(t.applicationId) === String(applicationId))
 
-    const handleDraft = async () => {
-        if (!applicationId) return
-        setLoadingDraft(true)
-        try {
-            const response = await messageService.getAIDraft(applicationId)
-            if (response.success && response.data.draft) {
-                setAiDraftBody(response.data.draft)
-                setAiDraftTrigger((k) => k + 1)
-                toast.success('Draft generated — review and send.')
-            } else {
-                toast.error(response.message || 'Draft failed')
-            }
-        } catch (error) {
-            toast.error(error.message || 'Could not generate draft')
-        } finally {
-            setLoadingDraft(false)
-        }
-    }
+    const markThreadReadLocally = useCallback((readApplicationId) => {
+        setThreads((prev) => prev.map((thread) =>
+            String(thread.applicationId) === String(readApplicationId)
+                ? { ...thread, unread: 0 }
+                : thread,
+        ))
+    }, [])
 
     if (!companyLoaded) return <Loading />
 
@@ -73,7 +58,7 @@ const RecruiterMessages = () => {
                 <div>
                     <h1 className='text-3xl font-bold text-slate-900 tracking-tight'>Candidate Inbox</h1>
                     <p className='text-slate-500 text-sm mt-1'>
-                        Direct communication with shortlisted talent — use AI for professional drafting.
+                        Direct communication with shortlisted talent.
                     </p>
                 </div>
                 <button
@@ -81,7 +66,7 @@ const RecruiterMessages = () => {
                     onClick={() => navigate('/dashboard/view-applications')}
                     className='text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1'
                 >
-                    <span>←</span> Back to pipeline
+                    <span>{'<'}</span> Back to pipeline
                 </button>
             </div>
 
@@ -89,7 +74,7 @@ const RecruiterMessages = () => {
                 <aside className='lg:col-span-2 border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden h-[500px] lg:h-[600px] flex flex-col'>
                     <div className='px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center'>
                         <p className='text-xs font-bold uppercase tracking-widest text-slate-400'>Conversations</p>
-                        <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{threads.length}</span>
+                        <span className='text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium'>{threads.length}</span>
                     </div>
                     <div className='overflow-y-auto flex-1 scrollbar-hide'>
                         {loading ? (
@@ -97,9 +82,9 @@ const RecruiterMessages = () => {
                                 <div className='w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin' />
                             </div>
                         ) : threads.length === 0 ? (
-                            <div className="p-10 text-center">
+                            <div className='p-10 text-center'>
                                 <p className='text-sm text-slate-400'>No active threads.</p>
-                                <p className="text-xs text-slate-400 mt-1">Start a conversation from the applications board.</p>
+                                <p className='text-xs text-slate-400 mt-1'>Start a conversation from the applications board.</p>
                             </div>
                         ) : (
                             threads.map((t) => (
@@ -111,7 +96,7 @@ const RecruiterMessages = () => {
                                         String(t.applicationId) === String(applicationId) ? 'bg-indigo-50/80 border-l-4 border-l-indigo-600' : 'border-l-4 border-l-transparent'
                                     }`}
                                 >
-                                    <div className="relative shrink-0">
+                                    <div className='relative shrink-0'>
                                         <img
                                             src={t.candidateImage || assets.profile_img}
                                             onError={(e) => { e.currentTarget.src = assets.profile_img }}
@@ -119,7 +104,7 @@ const RecruiterMessages = () => {
                                             className='w-12 h-12 rounded-full object-cover shadow-sm'
                                         />
                                         {t.unread > 0 && (
-                                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-600 border-2 border-white rounded-full"></span>
+                                            <span className='absolute -top-1 -right-1 w-3 h-3 bg-indigo-600 border-2 border-white rounded-full'></span>
                                         )}
                                     </div>
                                     <div className='min-w-0 flex-1'>
@@ -128,7 +113,7 @@ const RecruiterMessages = () => {
                                                 {t.candidateName}
                                             </span>
                                             {t.lastMessage && (
-                                                <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                                <span className='text-[10px] text-slate-400 whitespace-nowrap'>
                                                     {new Date(t.lastMessage.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                                                 </span>
                                             )}
@@ -152,10 +137,7 @@ const RecruiterMessages = () => {
                         peerLabel={active?.candidateName || 'Candidate'}
                         peerImage={active?.candidateImage}
                         draftRole='company'
-                        onDraft={handleDraft}
-                        loadingDraft={loadingDraft}
-                        aiDraftTrigger={aiDraftTrigger}
-                        aiDraftBody={aiDraftBody}
+                        onThreadRead={markThreadReadLocally}
                     />
                 </section>
             </div>

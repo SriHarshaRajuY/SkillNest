@@ -10,6 +10,10 @@ export const messageService = {
         params,
         headers: { Authorization: `Bearer ${clerkToken}` }
     }),
+
+    markUserThreadRead: (applicationId, clerkToken) => apiClient.post(`/api/users/messages/thread/${applicationId}/read`, {}, {
+        headers: { Authorization: `Bearer ${clerkToken}` }
+    }),
     
     sendUserMessage: (data, clerkToken) => apiClient.post('/api/users/messages', data, {
         headers: { Authorization: `Bearer ${clerkToken}` }
@@ -23,8 +27,8 @@ export const messageService = {
     getRecruiterThreads: () => apiClient.get('/api/company/messages/threads'),
     
     getRecruiterThreadMessages: (applicationId, params) => apiClient.get(`/api/company/messages/thread/${applicationId}`, { params }),
+
+    markRecruiterThreadRead: (applicationId) => apiClient.post(`/api/company/messages/thread/${applicationId}/read`, {}),
     
     sendRecruiterMessage: (data) => apiClient.post('/api/company/messages', data),
-    
-    getAIDraft: (applicationId) => apiClient.post('/api/company/messages/ai-draft', { applicationId }),
 };

@@ -1,15 +1,22 @@
 import jwt from 'jsonwebtoken'
+import { getAuth } from '@clerk/express'
 import Company from '../models/Company.js'
 import logger from '../utils/logger.js'
 
-/**
- * Protect routes that require a logged-in Clerk user.
- * Clerk middleware attaches req.auth automatically.
- */
+export const getClerkAuth = (req) => {
+    try {
+        return getAuth(req)
+    } catch {
+        return req.auth || {}
+    }
+}
+
 export const protectUser = (req, res, next) => {
-    if (!req.auth?.userId) {
+    const auth = getClerkAuth(req)
+    if (!auth?.userId) {
         return res.status(401).json({ success: false, message: 'Authentication required. Please sign in.' })
     }
+    req.auth = auth
     next()
 }
 

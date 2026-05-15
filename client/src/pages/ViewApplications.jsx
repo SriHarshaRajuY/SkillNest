@@ -137,10 +137,10 @@ const ViewApplications = () => {
                     ...prev,
                     [applicationId]: { loading: false, score: response.data.score, reason: response.data.reason },
                 }))
-                toast.success('AI Match generated')
+                toast.success('Match score generated')
             }
         } catch (error) {
-            const message = error.message || 'AI Match failed'
+            const message = error.message || 'Match score failed'
             setMatchResults(prev => ({ ...prev, [applicationId]: { loading: false, error: message } }))
             toast.error(message)
         }
@@ -184,7 +184,7 @@ const ViewApplications = () => {
     if (applicants.length === 0) {
         return (
             <div className='flex flex-col items-center justify-center h-[70vh] text-center animate-fade-in'>
-                <div className='text-6xl mb-6 grayscale'>📋</div>
+                <div className='text-6xl mb-6 grayscale'>Empty</div>
                 <h3 className='text-xl text-slate-800 font-bold'>No Applications Yet</h3>
                 <p className='text-sm text-slate-400 mt-2 max-w-xs'>
                     Candidates applying for your roles will appear here. Try posting a new job!
@@ -263,6 +263,7 @@ const ViewApplications = () => {
                     savingNote={savingNote}
                     submitInternalNote={submitInternalNote}
                     viewMode={viewMode}
+                    viewApplicantResume={viewApplicantResume}
                 />
             </div>
         </div>

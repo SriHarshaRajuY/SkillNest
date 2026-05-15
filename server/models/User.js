@@ -1,11 +1,5 @@
 import mongoose from 'mongoose'
 
-const assessmentResultSchema = new mongoose.Schema({
-    jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job' },
-    score: { type: Number, required: true },
-    date: { type: Date, default: Date.now }
-}, { _id: false })
-
 const resumeAssetSchema = new mongoose.Schema({
     publicId: { type: String, trim: true },
     resourceType: { type: String, enum: ['image', 'raw', 'video'], default: 'raw' },
@@ -20,12 +14,6 @@ const userSchema = new mongoose.Schema({
     resume: { type: String, default: '' },
     resumeAsset: { type: resumeAssetSchema, default: null },
     image: { type: String, default: '' },
-    
-    // New Fields for upgraded capabilities
-    skills: { type: [String], default: [] },
-    credibilityScore: { type: Number, default: 50, min: 0, max: 100 },
-    profileCompleteness: { type: Number, default: 0, min: 0, max: 100 },
-    assessments: { type: [assessmentResultSchema], default: [] }
 }, { timestamps: true })
 
 const User = mongoose.models.User || mongoose.model('User', userSchema)

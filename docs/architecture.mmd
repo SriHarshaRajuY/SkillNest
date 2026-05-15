@@ -1,53 +1,49 @@
 graph TD
-    User((Candidate))
+    Candidate((Candidate))
     Recruiter((Recruiter))
-    
-    subgraph Frontend ["Frontend Layer (React 18 + Vite)"]
-        UI[UI Components / Kanban]
-        Context[AppContext / Token Mgmt]
-        Hooks[Custom Hooks / useSocket]
-        SocketClient[Socket.io Client]
+
+    subgraph Frontend["React + Vite Frontend"]
+        PublicJobs["Job Search and Job Detail"]
+        CandidateApp["Resume, Applications, Messages"]
+        RecruiterApp["Dashboard, Pipeline, Messages"]
+        SocketClient["Socket.io Client"]
     end
-    
-    subgraph Security ["Security & Documentation"]
-        Swagger[Swagger UI / api-docs]
-        Multer[Multer / PDF & Img Filter]
-        RateLimit[Express Rate Limiter]
-        Clerk[Clerk Auth / JWT Middleware]
+
+    subgraph Backend["Express Modular Monolith"]
+        REST["REST API"]
+        Auth["Clerk + Recruiter JWT Middleware"]
+        Validation["Joi Validation"]
+        AIService["AI Resume Service"]
+        SocketHub["Socket.io Hub"]
+        Swagger["Swagger UI"]
     end
-    
-    subgraph Backend ["Backend Layer (Node.js + Express)"]
-        API[REST API Endpoints]
-        SocketHub[Socket.io Hub / Rooms]
-        AI[AI Service / Gemini NLP]
+
+    subgraph Data["Data and External Services"]
+        Mongo[(MongoDB)]
+        Redis[(Redis Cache)]
+        Cloudinary[(Private Resume Storage)]
+        Gemini[(Gemini API)]
     end
-    
-    subgraph Data ["Data & Optimization Layer"]
-        Mongo[(MongoDB Atlas)]
-        Redis[(Upstash Redis Cache)]
-        Cloudinary[(Cloudinary Storage)]
-    end
-    
-    %% Connections
-    User -->|Interaction| UI
-    Recruiter -->|Interaction| UI
-    
-    UI --> Context
-    UI --> SocketClient
-    
-    Context -->|HTTPS| RateLimit
-    RateLimit --> Clerk
-    Clerk --> API
-    
-    API --> Swagger
-    API --> Multer
-    Multer --> Cloudinary
-    
-    API --> Mongo
-    API --> AI
-    AI -->|Cache Match| Redis
-    
+
+    Candidate --> PublicJobs
+    Candidate --> CandidateApp
+    Recruiter --> RecruiterApp
+
+    PublicJobs --> REST
+    CandidateApp --> REST
+    RecruiterApp --> REST
+    CandidateApp --> SocketClient
+    RecruiterApp --> SocketClient
+
+    REST --> Auth
+    Auth --> Validation
+    Validation --> Mongo
+    REST --> Cloudinary
+    REST --> AIService
+    AIService --> Redis
+    AIService --> Gemini
+    REST --> Swagger
+
     SocketClient <--> SocketHub
-    SocketHub --> Redis
-    SocketHub <--> User
-    SocketHub <--> Recruiter
+    SocketHub --> Auth
+    SocketHub --> Mongo

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@clerk/clerk-react'
 import Navbar from '../components/Navbar'
@@ -43,6 +43,14 @@ const CandidateMessages = () => {
 
     const active = threads.find((t) => String(t.applicationId) === String(applicationId))
 
+    const markThreadReadLocally = useCallback((readApplicationId) => {
+        setThreads((prev) => prev.map((thread) =>
+            String(thread.applicationId) === String(readApplicationId)
+                ? { ...thread, unread: 0 }
+                : thread,
+        ))
+    }, [])
+
     if (!userDataLoaded) return <Loading />
 
     if (!clerkToken) {
@@ -72,7 +80,7 @@ const CandidateMessages = () => {
                         to='/applications'
                         className='text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1'
                     >
-                        <span>←</span> Back to applications
+                        <span>{'<'}</span> Back to applications
                     </Link>
                 </div>
 
@@ -144,6 +152,7 @@ const CandidateMessages = () => {
                             peerLabel={active?.companyName || 'Recruiter'}
                             peerImage={active?.companyImage}
                             draftRole='user'
+                            onThreadRead={markThreadReadLocally}
                         />
                     </section>
                 </div>

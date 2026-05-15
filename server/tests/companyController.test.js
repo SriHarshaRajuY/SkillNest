@@ -20,7 +20,7 @@ jest.unstable_mockModule('../utils/redisClient.js', () => ({
 
 jest.unstable_mockModule('@clerk/express', () => ({
   clerkMiddleware: jest.fn(() => (_req, _res, next) => next()),
-  getAuth: jest.fn(() => ({ userId: null })),
+  getAuth: jest.fn((req) => req.auth || { userId: null }),
   clerkClient: { users: { getUser: jest.fn(), updateUser: jest.fn() } },
   requireAuth: jest.fn(() => (_req, _res, next) => next())
 }))
@@ -67,8 +67,8 @@ describe('Company Auth API', () => {
 
     expect(res.statusCode).toEqual(201)
     expect(res.body.success).toBe(true)
-    expect(res.body).toHaveProperty('token')
-    authToken = res.body.token
+    expect(res.body.data).toHaveProperty('token')
+    authToken = res.body.data.token
   })
 
   it('POST /api/company/register - rejects duplicate email', async () => {
@@ -100,7 +100,7 @@ describe('Company Auth API', () => {
 
     expect(res.statusCode).toEqual(200)
     expect(res.body.success).toBe(true)
-    expect(res.body).toHaveProperty('token')
+    expect(res.body.data).toHaveProperty('token')
   })
 
   it('POST /api/company/login - rejects wrong password', async () => {
@@ -119,7 +119,7 @@ describe('Company Auth API', () => {
 
     expect(res.statusCode).toEqual(200)
     expect(res.body.success).toBe(true)
-    expect(res.body.company.email).toBe('acme@test.com')
+    expect(res.body.data.company.email).toBe('acme@test.com')
   })
 
   it('GET /api/company/company - returns 401 without token', async () => {

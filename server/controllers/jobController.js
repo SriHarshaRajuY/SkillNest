@@ -10,9 +10,20 @@ export const getJobs = asyncHandler(async (req, res) => {
     const skip = (page - 1) * limit
 
     const filter = { visible: true }
-    if (req.query.category) filter.category = req.query.category
+    if (req.query.category) {
+        const categories = String(req.query.category).split(',').map((c) => c.trim()).filter(Boolean)
+        if (categories.length === 1) filter.category = categories[0]
+        if (categories.length > 1) filter.category = { $in: categories }
+    }
     if (req.query.level) filter.level = req.query.level
-    if (req.query.location) filter.location = { $regex: req.query.location, $options: 'i' }
+    if (req.query.locationFilter) {
+        const locations = String(req.query.locationFilter).split(',').map((l) => l.trim()).filter(Boolean)
+        if (locations.length > 0) {
+            filter.$or = locations.map((location) => ({ location: { $regex: location, $options: 'i' } }))
+        }
+    } else if (req.query.location) {
+        filter.location = { $regex: req.query.location, $options: 'i' }
+    }
     if (req.query.search) {
         filter.title = { $regex: req.query.search, $options: 'i' }
     }

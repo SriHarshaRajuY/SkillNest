@@ -4,9 +4,10 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "kill-port 5000 && nodemon server.js",
+    "dev": "node ./node_modules/kill-port/cli.js 5000 && nodemon server.js",
     "start": "node server.js",
-    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles --maxWorkers=1"
+    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles --maxWorkers=1",
+    "seed": "node scripts/seedDemoData.js"
   },
   "nodemonConfig": {
     "ignore": [
@@ -38,7 +39,6 @@
     "redis": "^4.7.0",
     "socket.io": "^4.8.3",
     "svix": "^1.42.0",
-    "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {

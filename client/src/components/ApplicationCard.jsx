@@ -62,7 +62,7 @@ const ApplicationCard = ({
                                 AI Match
                             </button>
                         ) : matchResults[applicant._id].loading ? (
-                            <span className='text-[10px] text-gray-500'>Analyzing…</span>
+                            <span className='text-[10px] text-gray-500'>Analyzing...</span>
                         ) : typeof matchResults[applicant._id].score === 'number' ? (
                             <span className={`text-xs font-bold px-2 py-1 rounded-md border ${matchResults[applicant._id].score >= 80 ? 'bg-green-50 text-green-700 border-green-200' : matchResults[applicant._id].score >= 50 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                 {matchResults[applicant._id].score}%

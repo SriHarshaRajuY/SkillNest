@@ -1,48 +1,107 @@
-import request from 'supertest';
-import { app } from '../server.js';
-import { generateMockCompanyToken } from './helpers/mockAuth.js';
+import request from 'supertest'
+import { jest } from '@jest/globals'
+import mongoose from 'mongoose'
+import { MongoMemoryServer } from 'mongodb-memory-server'
+import jwt from 'jsonwebtoken'
+import Company from '../models/Company.js'
 
-describe('API Validation Tests', () => {
-    let companyToken = generateMockCompanyToken('mock-id');
+let mongoServer
 
-    describe('Job Posting Validation', () => {
-        it('should return 400 if required fields are missing', async () => {
-            const res = await request(app)
-                .post('/api/company/post-job')
-                .set('token', companyToken)
-                .send({ title: 'Software Engineer' }); // Missing description, location, etc.
+jest.unstable_mockModule('../services/aiService.js', () => ({
+  default: { parsePDF: jest.fn(), generateMatchScore: jest.fn(), generateResumeSummary: jest.fn() }
+}))
 
-            expect(res.status).toBe(400);
-            expect(res.body.success).toBe(false);
-            expect(res.body.message).toMatch(/Validation failed/i);
-            expect(Array.isArray(res.body.errors)).toBe(true);
-        });
+jest.unstable_mockModule('../utils/redisClient.js', () => ({
+  cacheGet: jest.fn(() => Promise.resolve(null)),
+  cacheSet: jest.fn(() => Promise.resolve()),
+  cacheDel: jest.fn(() => Promise.resolve())
+}))
 
-        it('should return 400 for invalid data types (e.g., salary as string)', async () => {
-            const res = await request(app)
-                .post('/api/company/post-job')
-                .set('token', companyToken)
-                .send({
-                    title: 'DevOps',
-                    description: 'Build things',
-                    location: 'Remote',
-                    salary: 'not-a-number',
-                    level: 'Senior',
-                    category: 'Engineering'
-                });
+jest.unstable_mockModule('@clerk/express', () => ({
+  clerkMiddleware: jest.fn(() => (_req, _res, next) => next()),
+  getAuth: jest.fn((req) => req.auth || {}),
+  clerkClient: { users: { getUser: jest.fn() } },
+}))
 
-            expect(res.status).toBe(400);
-        });
-    });
+jest.unstable_mockModule('cloudinary', () => ({
+  v2: {
+    config: jest.fn(),
+    uploader: { upload: jest.fn() },
+    api: { resource: jest.fn() },
+    utils: { private_download_url: jest.fn(() => 'http://fake/resume.pdf') }
+  }
+}))
 
-    describe('Generic Parameter Validation', () => {
-        it('should handle malformed ObjectIds gracefully', async () => {
-            const res = await request(app)
-                .get('/api/company/match-resume/invalid-id-123')
-                .set('token', companyToken);
-            
-            // Joi or Mongoose should catch this before it crashes
-            expect(res.status).toBe(400);
-        });
-    });
-});
+const { app } = await import('../server.js')
+
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create()
+  if (mongoose.connection.readyState !== 0) await mongoose.disconnect()
+  await mongoose.connect(mongoServer.getUri())
+}, 30000)
+
+afterAll(async () => {
+  await mongoose.disconnect()
+  await mongoServer?.stop()
+})
+
+describe('API validation', () => {
+  let companyToken
+
+  beforeAll(async () => {
+    const company = await Company.create({
+      name: 'Validation Corp',
+      email: 'validation@test.com',
+      password: 'hashed',
+      image: 'http://fake/logo.png'
+    })
+    companyToken = jwt.sign({ id: company._id }, process.env.JWT_SECRET || 'test_secret_key_for_ci')
+  })
+
+  it('returns 400 if required job fields are missing', async () => {
+    const res = await request(app)
+      .post('/api/company/post-job')
+      .set('token', companyToken)
+      .send({ title: 'Software Engineer' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.success).toBe(false)
+    expect(res.body.message).toMatch(/Validation failed/i)
+    expect(Array.isArray(res.body.errors)).toBe(true)
+  })
+
+  it('returns 400 for invalid job field types', async () => {
+    const res = await request(app)
+      .post('/api/company/post-job')
+      .set('token', companyToken)
+      .send({
+        title: 'DevOps',
+        description: 'Build deployment tooling',
+        location: 'Remote',
+        salary: 'not-a-number',
+        level: 'Senior',
+        category: 'Engineering'
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 for malformed ObjectIds in validated bodies', async () => {
+    const res = await request(app)
+      .post('/api/company/change-status')
+      .set('token', companyToken)
+      .send({ id: 'invalid-id-123', pipelineStage: 'Screening' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.success).toBe(false)
+  })
+
+  it('returns 400 for unsupported pipeline stages', async () => {
+    const res = await request(app)
+      .post('/api/company/change-status')
+      .set('token', companyToken)
+      .send({ id: new mongoose.Types.ObjectId().toString(), pipelineStage: 'Technical' })
+
+    expect(res.status).toBe(400)
+  })
+})

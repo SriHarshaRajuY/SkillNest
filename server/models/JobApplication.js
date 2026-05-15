@@ -1,6 +1,5 @@
 import mongoose from 'mongoose'
-
-export const PIPELINE_STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired', 'Rejected']
+import { PIPELINE_STAGES, legacyStatusFromPipeline } from '../constants/pipeline.js'
 
 const internalNoteSchema = new mongoose.Schema({
     authorCompanyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
@@ -13,12 +12,6 @@ const pipelineEventSchema = new mongoose.Schema({
     stage: { type: String, enum: PIPELINE_STAGES, required: true },
     at: { type: Date, default: Date.now },
 }, { _id: false })
-
-function legacyStatusFromPipeline(stage) {
-    if (stage === 'Rejected') return 'Rejected'
-    if (stage === 'Hired' || stage === 'Offer') return 'Accepted'
-    return 'Pending'
-}
 
 const jobApplicationSchema = new mongoose.Schema({
     userId: { type: String, ref: 'User', required: true },
@@ -40,7 +33,7 @@ const jobApplicationSchema = new mongoose.Schema({
     internalNotes: { type: [internalNoteSchema], default: [] },
     date: { type: Number, required: true },
 
-    // Advanced Evaluation metrics
+    // Last generated AI match score for recruiter sorting and review.
     matchScore: { type: Number, default: 0 }
 }, { timestamps: true })
 

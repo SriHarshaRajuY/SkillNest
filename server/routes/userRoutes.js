@@ -11,6 +11,7 @@ import {
     getUserUnreadCount,
     listUserThreads,
     getUserThread,
+    markUserThreadRead,
     postUserMessage,
 } from '../controllers/messageController.js'
 import upload from '../config/multer.js'
@@ -99,6 +100,8 @@ router.get('/messages/threads', protectUser, listUserThreads)
  *     summary: Get all messages in a specific thread
  */
 router.get('/messages/thread/:applicationId', protectUser, getUserThread)
+
+router.post('/messages/thread/:applicationId/read', protectUser, markUserThreadRead)
 
 /**
  * @swagger

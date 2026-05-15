@@ -21,10 +21,15 @@ import 'react-toastify/dist/ReactToastify.css'
 import ErrorBoundary from './components/ErrorBoundary'
 
 const App = () => {
-    const { showRecruiterLogin } = useContext(AppContext)
+    const { showRecruiterLogin, apiOffline } = useContext(AppContext)
 
     return (
         <div className='min-h-screen bg-white text-gray-900'>
+            {apiOffline && (
+                <div className='bg-red-50 border-b border-red-100 text-red-700 text-sm px-4 py-2 text-center font-medium'>
+                    SkillNest API is currently unavailable. Please start the backend service and refresh this page.
+                </div>
+            )}
             {showRecruiterLogin && <RecruiterLogin />}
             <ToastContainer position='top-right' autoClose={3500} closeOnClick />
             <ErrorBoundary>

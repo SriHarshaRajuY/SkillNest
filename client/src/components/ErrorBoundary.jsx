@@ -18,7 +18,7 @@ class ErrorBoundary extends Component {
         if (this.state.hasError) {
             return (
                 <div className='min-h-screen bg-gray-50 flex flex-col items-center justify-center text-center px-6'>
-                    <div className='text-6xl mb-4'>⚠️</div>
+                    <div className='text-6xl mb-4'>!</div>
                     <h1 className='text-2xl font-semibold text-gray-800 mb-2'>Something went wrong</h1>
                     <p className='text-gray-500 max-w-md mb-6'>
                         An unexpected error occurred. Please refresh the page.

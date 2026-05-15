@@ -39,7 +39,10 @@ apiClient.interceptors.response.use(
         return response.data;
     },
     (error) => {
-        const message = error.response?.data?.message || 'Something went wrong. Please try again.';
+        const isNetworkError = !error.response;
+        const message = isNetworkError
+            ? 'SkillNest API is currently unavailable. Please try again after the backend service is running.'
+            : error.response?.data?.message || 'Something went wrong. Please try again.';
         const status = error.response?.status;
 
         // Handle Session Expiry (401)
@@ -52,6 +55,7 @@ apiClient.interceptors.response.use(
             success: false,
             message,
             status,
+            isNetworkError,
             errors: error.response?.data?.errors || []
         });
     }

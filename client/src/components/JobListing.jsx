@@ -29,8 +29,8 @@ const JobListing = () => {
                 limit: 6,
                 search: searchFilter.title || '',
                 location: searchFilter.location || '',
-                category: selectedCategories,
-                locationFilter: selectedLocations // The service might need to be checked for how it handles multiple locations
+                category: selectedCategories.join(','),
+                locationFilter: selectedLocations.join(',')
             }
 
             // Using jobService which uses apiClient and standardized responses
@@ -181,7 +181,7 @@ const JobListing = () => {
                         jobs.map((job) => <JobCard key={job._id} job={job} />)
                     ) : !error && (
                         <div className='col-span-full text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200'>
-                            <div className='text-4xl mb-4'>🔍</div>
+                            <div className='text-4xl mb-4'>No results</div>
                             <p className='text-slate-400 text-lg mb-2 font-bold'>No jobs found matching your criteria</p>
                             <button 
                                 onClick={() => {

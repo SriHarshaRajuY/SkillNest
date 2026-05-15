@@ -46,7 +46,7 @@ describe('JobCard Component', () => {
       </BrowserRouter>
     )
 
-    const applyBtn = screen.getByText('Apply now')
+    const applyBtn = screen.getByRole('button', { name: /apply now/i })
     expect(applyBtn).toBeInTheDocument()
     
     fireEvent.click(applyBtn)

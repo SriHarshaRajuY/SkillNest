@@ -8,9 +8,10 @@ import kconvert from 'k-convert';
 import moment from 'moment';
 import JobCard from '../components/JobCard'
 import Footer from '../components/Footer'
-import axios from 'axios'
 import { toast } from 'react-toastify'
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react'
+import { jobService } from '../services/jobService'
+import { applicationService } from '../services/applicationService'
 
 const ApplyJob = () => {
 
@@ -25,18 +26,18 @@ const ApplyJob = () => {
   const [JobData, setJobData] = useState(null)
   const [isAlreadyApplied, setIsAlreadyApplied] = useState(false)
 
-  const { jobs, backendUrl, userData, userDataLoaded, userApplications, fetchUserApplications } = useContext(AppContext)
+  const { jobs, userData, userDataLoaded, userApplications, fetchUserApplications } = useContext(AppContext)
 
   const fetchJob = async () => {
 
     try {
 
-      const { data } = await axios.get(backendUrl + `/api/jobs/${id}`)
+      const response = await jobService.getJobById(id)
 
-      if (data.success) {
-        setJobData(data.job)
+      if (response.success) {
+        setJobData(response.data.job)
       } else {
-        toast.error(data.message)
+        toast.error(response.message)
       }
 
     } catch (error) {
@@ -72,16 +73,13 @@ const ApplyJob = () => {
 
       const token = await getToken()
 
-      const { data } = await axios.post(backendUrl + '/api/users/apply',
-        { jobId: JobData._id },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const response = await applicationService.applyToJob(JobData._id, token)
 
-      if (data.success) {
-        toast.success(data.message)
+      if (response.success) {
+        toast.success(response.message)
         fetchUserApplications()
       } else {
-        toast.error(data.message)
+        toast.error(response.message)
       }
 
     } catch (error) {

@@ -18,7 +18,7 @@ jest.unstable_mockModule('../utils/redisClient.js', () => ({
 
 jest.unstable_mockModule('@clerk/express', () => ({
   clerkMiddleware: jest.fn(() => (_req, _res, next) => next()),
-  getAuth: jest.fn(() => ({ userId: null })),
+  getAuth: jest.fn((req) => req.auth || { userId: null }),
   clerkClient: { users: { getUser: jest.fn(), updateUser: jest.fn() } },
   requireAuth: jest.fn(() => (_req, _res, next) => next())
 }))
@@ -40,6 +40,6 @@ describe('GET /api/health', () => {
     const res = await request(app).get('/api/health')
     expect(res.statusCode).toEqual(200)
     expect(res.body).toHaveProperty('success', true)
-    expect(res.body.message).toMatch(/SkillNest API is running/)
+    expect(res.body.message).toMatch(/SkillNest API is operational/)
   })
 })

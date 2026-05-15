@@ -1,119 +1,134 @@
-# SkillNest: AI-Assisted Recruitment Platform
+# SkillNest
 
-SkillNest is a full-stack MERN platform built with a focus on robust backend engineering, clean architecture, and realistic recruitment workflows. It leverages Google Gemini AI for resume matching and real-time communication via Socket.io, providing a polished and scalable foundation for internship/SDE candidate evaluation.
+SkillNest is a focused recruitment workflow platform for candidates and recruiters.
 
----
+Candidates can browse jobs, upload a resume, apply, track pipeline updates, and message recruiters after shortlisting. Recruiters can post jobs, review applicants, move candidates through a hiring pipeline, view short-lived signed resume links, and use AI-assisted resume summaries and match scores.
 
-## 🛠 Core Features
+The project is intentionally built as a modular monolith: simple enough to reason about as a student project, but structured around real backend concerns like authorization, validation, file privacy, caching, realtime messaging, and integration testing.
 
-### 🧠 AI Integration (Gemini AI)
-- **Automated Resume Matching**: Analyzes candidate resumes against job descriptions using Google Gemini Pro, generating a match score and technical reasoning.
-- **Reliability Layer**: Implemented timeout handling, defensive JSON parsing, and exponential backoff retries to ensure AI service stability.
-- **Redis Caching**: Frequently accessed match results are cached in Redis to reduce LLM latency and API costs.
+## Core Flows
 
-### 📊 Recruiter Pipeline Management
-- **Workflow Management**: Real-time pipeline updates (Applied, Screening, Interview, Offer, Rejected) with automatic candidate notification.
-- **Internal Notes**: Recruiters can add private feedback and ratings to applications, synced in real-time across the hiring team.
-- **Job Lifecycle**: Full control over job posting, visibility toggling, and applicant tracking.
+- Candidate browses and filters public jobs.
+- Candidate uploads a PDF resume and applies to a job.
+- Recruiter posts jobs and controls job visibility.
+- Recruiter reviews applicants in table or Kanban pipeline views.
+- Recruiter requests AI resume summary or match score for an application.
+- Candidate and recruiter communicate in application-scoped chat rooms after shortlisting.
 
-### 💬 Real-time Messaging
-- **Instant Communication**: Socket.io-based chat between recruiters and candidates.
-- **Room Isolation**: Strict authorization-based room joining to ensure data privacy.
-- **Unread Sync**: Real-time unread message counters for both candidates and recruiters.
+## Tech Stack
 
----
+- Frontend: React, Vite, Tailwind CSS, Clerk, Socket.io Client
+- Backend: Node.js, Express, Mongoose, Socket.io, Joi, JWT
+- Services: MongoDB, Cloudinary private assets, Redis-compatible cache, Gemini
+- Quality: Jest, Supertest, Vitest, Swagger UI, GitHub Actions
 
-## 🏗 System Architecture
+## Engineering Highlights
 
-SkillNest is built as a modular monolith, prioritizing simplicity and maintainability over overengineered microservices.
+- Modular monolith with separate routes, controllers, services, middleware, models, and realtime hub.
+- Two auth contexts: Clerk for candidates and recruiter JWT for company accounts.
+- Resume privacy through Cloudinary private assets and short-lived signed URLs.
+- Database-level duplicate application prevention with a unique `{ userId, jobId }` index.
+- AI reliability wrapper with PDF parsing, context truncation, timeout, retry, and defensive JSON parsing.
+- Versioned AI cache keys so resume/job changes do not reuse stale match results.
+- Socket.io room isolation with JWT auth and database ownership checks before joining application rooms.
+- Centralized Joi validation and normalized API response envelopes.
 
-```mermaid
-graph TD
-    User((User/Recruiter)) -->|React + Vite| Frontend[Frontend UI]
-    Frontend -->|JWT/Clerk| Backend[Express API]
-    Backend -->|Aggregation| MongoDB[(MongoDB Atlas)]
-    Backend -->|Caching| Redis[(Redis)]
-    Backend -->|NLP| Gemini[Gemini AI]
-    Backend -->|Assets| Cloudinary[Cloudinary]
-    Backend -->|Realtime| Socket[Socket.io Hub]
+## API Docs
+
+Run the backend and open:
+
+```bash
+http://localhost:5000/api-docs
 ```
 
----
+Swagger documents all active candidate, recruiter, jobs, messaging, AI, and health endpoints.
 
-## ⚡ Technical Highlights
+## Setup
 
-- **Database Optimization**: Implemented compound indexing and `.lean()` queries to ensure sub-100ms response times for data-heavy listing operations.
-- **Validation Layer**: Centralized request validation using **Joi**, ensuring data integrity and sanitization across all API boundaries.
-- **Structured Logging**: Replaced scattered console logs with a centralized, level-based logger for better observability.
-- **Security**: 
-  - **Clerk Auth**: Secure candidate authentication.
-  - **JWT Auth**: Independent recruiter authentication.
-  - **Signed URLs**: Resumes are served via time-limited Cloudinary signed URLs.
-- **Pagination & Filtering**: Efficient server-side pagination and complex filtering for jobs and applications.
+### Backend
 
----
+Create `server/.env`:
 
-## 🚀 Tech Stack
+```env
+PORT=5000
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
+MONGODB_URI=...
+JWT_SECRET=...
+GEMINI_API_KEY=...
+REDIS_URL=...
+CLOUDINARY_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_SECRET_KEY=...
+CLERK_WEBHOOK_SECRET=...
+```
 
-- **Frontend**: React 18, Vite, Tailwind CSS, Clerk (User Auth), Socket.io Client.
-- **Backend**: Node.js, Express, Mongoose, Socket.io, Joi (Validation), Winston (Logging).
-- **Services**: Google Gemini AI, Cloudinary (Storage), Upstash/Redis (Cache).
-- **Testing**: Jest + Supertest (Integration), Vitest (UI).
+Then run:
 
----
+```bash
+cd server
+npm install
+npm run dev
+```
 
-## 🚦 Getting Started
+### Frontend
 
-### Prerequisites
-- Node.js (v18+)
-- MongoDB Atlas Account
-- Clerk Account (Frontend Auth)
-- Gemini AI API Key
-- Cloudinary Account
-- Redis Instance (Local or Upstash)
+Create `client/.env`:
 
-### Installation
+```env
+VITE_BACKEND_URL=http://localhost:5000
+VITE_CLERK_PUBLISHABLE_KEY=...
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/SriHarshaRajuY/SkillNest.git
-   cd SkillNest
-   ```
+Then run:
 
-2. **Backend Configuration**
-   In `server/.env`:
-   ```env
-   MONGODB_URI=...
-   JWT_SECRET=...
-   GEMINI_API_KEY=...
-   REDIS_URL=...
-   CLOUDINARY_URL=...
-   ```
+```bash
+cd client
+npm install
+npm run dev
+```
 
-3. **Frontend Configuration**
-   In `client/.env`:
-   ```env
-   VITE_CLERK_PUBLISHABLE_KEY=...
-   VITE_BACKEND_URL=http://localhost:5000
-   ```
+You can also run the scripts from the repository root:
 
-4. **Run the Project**
-   ```bash
-   # Terminal 1: Backend
-   cd server && npm install && npm run dev
+```bash
+npm run dev:server
+npm run dev:client
+```
 
-   # Terminal 2: Frontend
-   cd client && npm install && npm run dev
-   ```
+## Demo Data
 
----
+To seed recruiter-focused demo data:
 
-## 🧪 Quality Assurance
+```bash
+cd server
+npm run seed
+```
 
-- **Integration Tests**: `cd server && npm test` (Covers AI flow, Authentication, and Database operations).
-- **Frontend Tests**: `cd client && npm test` (Covers UI component integrity).
+The seed script creates a demo recruiter company, jobs, candidates, and applications for the recruiter pipeline view.
 
----
+## Tests
 
-## 📄 License
-Distributed under the MIT License.
+```bash
+cd server
+npm test
+
+cd client
+npm test
+```
+
+The backend test suite covers health, auth, validation, company auth, AI cache flow, and realtime initialization. The frontend suite currently covers the job card behavior and Clerk mocking setup.
+
+## Current Limitations
+
+- Realtime messaging is configured for a single Node.js instance. For horizontal scaling, add the Socket.io Redis adapter.
+- AI resume matching is assistive only. It should support recruiter review, not make automatic hiring decisions.
+- Redis is used as an optional cache. If Redis is unavailable, AI endpoints still work without caching.
+- Demo candidate users are seeded for recruiter review, not real Clerk login accounts.
+
+## Interview Positioning
+
+SkillNest is best described as:
+
+> An AI-assisted recruitment workflow platform with secure resume access, recruiter pipeline management, and realtime application-scoped messaging.
+
+The strongest discussion points are the auth boundary, signed resume access, AI failure handling, cache invalidation, database indexes, duplicate application protection, and Socket.io room authorization.

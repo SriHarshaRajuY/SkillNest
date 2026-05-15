@@ -30,11 +30,11 @@ const Hero = () => {
                 </div>
 
                 <div className='relative z-10'>
-                    <h2 className='text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300'>
-                        Over 10,000+ jobs to apply
+                    <h2 className='text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight text-white'>
+                        Find roles and track every application
                     </h2>
                     <p className='mb-10 max-w-2xl mx-auto text-base md:text-lg font-light text-gray-200 px-5'>
-                        Your Next Big Career Move Starts Right Here - Explore the Best Job Opportunities and Take the First Step Toward Your Future!
+                        SkillNest connects candidates and recruiters through secure resumes, live hiring stages, and focused communication.
                     </p>
                     
                     <div className='glass flex flex-col sm:flex-row items-center justify-between rounded-xl text-gray-800 max-w-2xl mx-4 sm:mx-auto p-2 shadow-lg transition-transform hover:scale-[1.01] duration-300'>
@@ -65,18 +65,6 @@ const Hero = () => {
                             Search
                         </button>
                     </div>
-                </div>
-            </div>
-
-            <div className='border border-gray-200 bg-white shadow-sm mx-2 mt-8 p-8 rounded-xl flex animate-fade-in-delay-1'>
-                <div className='flex justify-center items-center gap-10 lg:gap-16 flex-wrap w-full'>
-                    <p className='font-semibold text-gray-500 uppercase tracking-wider text-sm'>Trusted by</p>
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.microsoft_logo} alt='Microsoft' />
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.walmart_logo} alt='Walmart' />
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.accenture_logo} alt='Accenture' />
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.samsung_logo} alt='Samsung' />
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.amazon_logo} alt='Amazon' />
-                    <img className='h-7 transition-all duration-300 cursor-pointer hover:scale-110' src={assets.adobe_logo} alt='Adobe' />
                 </div>
             </div>
         </div>

@@ -1,16 +1,16 @@
 import { useContext, useState, useRef, useEffect } from 'react'
 import { useClerk, UserButton, useUser, useAuth } from '@clerk/clerk-react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import { AppContext } from '../context/AppContext'
 import SkillNestLogo from './SkillNestLogo'
+import { messageService } from '../services/messageService'
 
 const Navbar = () => {
     const { openSignIn } = useClerk()
     const { user } = useUser()
     const { getToken } = useAuth()
     const navigate = useNavigate()
-    const { setShowRecruiterLogin, backendUrl } = useContext(AppContext)
+    const { setShowRecruiterLogin } = useContext(AppContext)
     const [msgUnread, setMsgUnread] = useState(0)
     const [mobileOpen, setMobileOpen] = useState(false)
     const menuRef = useRef(null)
@@ -36,21 +36,21 @@ const Navbar = () => {
             try {
                 const token = await getToken()
                 if (!token || cancelled) return
-                const { data } = await axios.get(`${backendUrl}/api/users/messages/unread-count`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                })
-                if (!cancelled && data.success) setMsgUnread(data.count || 0)
+                const response = await messageService.getUserUnreadCount(token)
+                if (!cancelled && response.success) setMsgUnread(response.data.count || 0)
             } catch {
                 if (!cancelled) setMsgUnread(0)
             }
         }
         tick()
         const id = setInterval(tick, 60000)
+        window.addEventListener('skillnest:messages-read', tick)
         return () => {
             cancelled = true
             clearInterval(id)
+            window.removeEventListener('skillnest:messages-read', tick)
         }
-    }, [user, backendUrl, getToken])
+    }, [user, getToken])
 
     return (
         <div className='shadow-sm border-b bg-white sticky top-0 z-50' ref={menuRef}>

@@ -31,7 +31,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './server/package-lock.json'
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
+      - name: Run Lint
+        run: npm run lint
       - name: Run Tests
         run: npm test
         env:
@@ -40,10 +42,9 @@ jobs:
           REDIS_URL: "redis://localhost:6379"
           CLOUDINARY_NAME: "test"
           CLOUDINARY_API_KEY: "test"
-          CLOUDINARY_API_SECRET: "test"
+          CLOUDINARY_SECRET_KEY: "test"
           GEMINI_API_KEY: "test"
-          CLERK_PUBLISHABLE_KEY: "pk_test_123"
-          CLERK_SECRET_KEY: "sk_test_123"
+          CLERK_WEBHOOK_SECRET: "whsec_test"
 
   client-tests:
     runs-on: ubuntu-latest
@@ -59,8 +60,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './client/package-lock.json'
       - name: Install Dependencies
-        run: npm install
-      - name: Run Lint
-        run: npm run lint
+        run: npm ci
       - name: Run Tests
         run: npm test
+      - name: Build Client
+        run: npm run build
+        env:
+          VITE_BACKEND_URL: "http://localhost:5000"
+          VITE_CLERK_PUBLISHABLE_KEY: "pk_test_123"

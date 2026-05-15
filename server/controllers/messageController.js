@@ -1,12 +1,10 @@
 import Message from '../models/Message.js'
 import JobApplication from '../models/JobApplication.js'
-import Company from '../models/Company.js'
-import aiService from '../services/aiService.js'
-import { fetchResumeBuffer } from './userController.js'
 import { emitToApplication } from '../realtime/socketHub.js'
 import asyncHandler from '../middleware/asyncHandler.js'
+import { getClerkAuth } from '../middleware/authMiddleware.js'
 
-const userIdFromReq = (req) => req.auth?.userId
+const userIdFromReq = (req) => getClerkAuth(req)?.userId
 
 async function loadApplicationForUser(userId, applicationId) {
     const app = await JobApplication.findById(applicationId)
@@ -97,6 +95,34 @@ export const getUserThread = asyncHandler(async (req, res) => {
                 companyImage: app.companyId?.image,
             }
         }
+    })
+})
+
+// @desc    Mark a candidate thread as read
+// @route   POST /api/users/messages/thread/:applicationId/read
+// @access  Private (User)
+export const markUserThreadRead = asyncHandler(async (req, res) => {
+    const { applicationId } = req.params
+    const userId = userIdFromReq(req)
+    const app = await loadApplicationForUser(userId, applicationId)
+    if (!app) {
+        res.status(403)
+        throw new Error('Not authorized to access this thread')
+    }
+
+    const result = await Message.updateMany(
+        {
+            applicationId,
+            fromUser: false,
+            $or: [{ seenByUserAt: null }, { seenByUserAt: { $exists: false } }],
+        },
+        { $set: { seenByUserAt: new Date() } },
+    )
+
+    res.json({
+        success: true,
+        message: 'Thread marked as read',
+        data: { modifiedCount: result.modifiedCount || 0 },
     })
 })
 
@@ -292,6 +318,34 @@ export const getCompanyThread = asyncHandler(async (req, res) => {
     })
 })
 
+// @desc    Mark a recruiter thread as read
+// @route   POST /api/company/messages/thread/:applicationId/read
+// @access  Private (Company)
+export const markCompanyThreadRead = asyncHandler(async (req, res) => {
+    const { applicationId } = req.params
+    const companyId = req.company._id
+    const app = await loadApplicationForCompany(companyId, applicationId)
+    if (!app) {
+        res.status(403)
+        throw new Error('Not authorized to access this thread')
+    }
+
+    const result = await Message.updateMany(
+        {
+            applicationId,
+            fromUser: true,
+            $or: [{ seenByCompanyAt: null }, { seenByCompanyAt: { $exists: false } }],
+        },
+        { $set: { seenByCompanyAt: new Date() } },
+    )
+
+    res.json({
+        success: true,
+        message: 'Thread marked as read',
+        data: { modifiedCount: result.modifiedCount || 0 },
+    })
+})
+
 // @desc    Post a message as a recruiter
 // @route   POST /api/company/messages
 // @access  Private (Company)
@@ -324,52 +378,5 @@ export const postCompanyMessage = asyncHandler(async (req, res) => {
         success: true, 
         message: 'Message sent successfully',
         data: { message: msg } 
-    })
-})
-
-// @desc    AI draft for interview invite
-// @route   POST /api/company/messages/ai-draft
-// @access  Private (Company)
-export const aiInterviewDraft = asyncHandler(async (req, res) => {
-    const { applicationId } = req.body
-    if (!applicationId) {
-        res.status(400)
-        throw new Error('Application ID is required')
-    }
-    const companyId = req.company._id
-    const application = await JobApplication.findById(applicationId)
-        .populate('userId', 'name resume')
-        .populate('jobId', 'title description')
-        .lean()
-    
-    if (!application || application.companyId.toString() !== companyId.toString()) {
-        res.status(403)
-        throw new Error('Not authorized')
-    }
-
-    const company = await Company.findById(companyId).select('name').lean()
-    let resumeSnippet = ''
-    if (application.userId?.resume) {
-        try {
-            const { buffer } = await fetchResumeBuffer(application.userId, { timeoutMs: 8000 })
-            const full = await aiService.parsePDF(buffer)
-            resumeSnippet = full.slice(0, 6000)
-        } catch {
-            resumeSnippet = ''
-        }
-    }
-
-    const draft = await aiService.generateInterviewInviteDraft({
-        candidateName: application.userId?.name || 'Candidate',
-        jobTitle: application.jobId?.title || 'Role',
-        jobDescription: application.jobId?.description || '',
-        companyName: company?.name || 'Our team',
-        resumeSnippet,
-    })
-
-    res.json({ 
-        success: true, 
-        message: 'AI draft generated successfully',
-        data: { draft } 
     })
 })

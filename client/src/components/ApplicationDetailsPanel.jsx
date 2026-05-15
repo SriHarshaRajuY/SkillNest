@@ -11,7 +11,8 @@ const ApplicationDetailsPanel = ({
     setNoteRating,
     savingNote,
     submitInternalNote,
-    viewMode
+    viewMode,
+    viewApplicantResume
 }) => {
     const [summary, setSummary] = useState(null)
     const [loadingSummary, setLoadingSummary] = useState(false)
@@ -56,9 +57,11 @@ const ApplicationDetailsPanel = ({
                 </div>
             ) : summary ? (
                 <>
-                    <p className='text-sm text-indigo-900/80 leading-relaxed mb-3'>{summary.summary}</p>
+                    <p className='text-sm text-indigo-900/80 leading-relaxed mb-3'>
+                        {summary.experienceSummary || summary.summary}
+                    </p>
                     <div className='flex flex-wrap gap-1.5'>
-                        {summary.topSkills?.map((skill, i) => (
+                        {(summary.skills || summary.topSkills || []).map((skill, i) => (
                             <span key={i} className='px-2 py-0.5 bg-white border border-indigo-200 text-indigo-700 text-[10px] font-bold rounded-full'>
                                 {skill}
                             </span>
@@ -89,7 +92,7 @@ const ApplicationDetailsPanel = ({
                             to={`/dashboard/messages/${selectedApplicant._id}`}
                             className='inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all'
                         >
-                            Open secure chat →
+                            Open secure chat
                         </Link>
                     </div>
                     <div>
@@ -102,7 +105,7 @@ const ApplicationDetailsPanel = ({
                                 <div key={n._id} className='rounded-xl border border-gray-100 p-3 bg-slate-50 shadow-sm'>
                                     <div className='flex justify-between items-center'>
                                         <span className='text-sm font-bold text-slate-800'>{n.authorName}</span>
-                                        {n.rating ? <span className='text-amber-500 text-xs font-bold'>{'★'.repeat(n.rating)}</span> : null}
+                                        {n.rating ? <span className='text-amber-500 text-xs font-bold'>{`${n.rating}/5`}</span> : null}
                                     </div>
                                     <p className='text-sm text-slate-600 mt-1.5 leading-relaxed'>{n.body}</p>
                                 </div>
@@ -124,7 +127,7 @@ const ApplicationDetailsPanel = ({
                                     type="text"
                                     value={noteBody}
                                     onChange={(e) => setNoteBody(e.target.value)}
-                                    placeholder='Team feedback…'
+                                    placeholder='Team feedback...'
                                     className='flex-1 border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
                                 />
                                 <button
@@ -157,7 +160,7 @@ const ApplicationDetailsPanel = ({
                         className='text-white/50 hover:text-white transition-colors'
                         onClick={() => setSelectedId(null)}
                     >
-                        ✕
+                        x
                     </button>
                 </div>
                 <div className='mt-4 flex gap-2'>
@@ -169,7 +172,7 @@ const ApplicationDetailsPanel = ({
                     </Link>
                     <button
                         type='button'
-                        onClick={() => window.open(selectedApplicant.userId.resume, '_blank')}
+                        onClick={() => viewApplicantResume(selectedApplicant._id)}
                         className='flex-1 bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-all'
                     >
                         Resume
@@ -196,7 +199,7 @@ const ApplicationDetailsPanel = ({
                                 <div className='flex justify-between items-start gap-2'>
                                     <span className='text-sm font-bold text-slate-800'>{n.authorName}</span>
                                     {n.rating ? (
-                                        <span className='text-amber-500 text-xs shrink-0'>{'★'.repeat(n.rating)}</span>
+                                        <span className='text-amber-500 text-xs shrink-0'>{`${n.rating}/5`}</span>
                                     ) : null}
                                 </div>
                                 <p className='text-sm text-slate-600 mt-2 leading-relaxed'>{n.body}</p>
@@ -229,7 +232,7 @@ const ApplicationDetailsPanel = ({
                         <textarea
                             value={noteBody}
                             onChange={(e) => setNoteBody(e.target.value)}
-                            placeholder='Team feedback…'
+                            placeholder='Team feedback...'
                             rows={3}
                             className='w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all'
                         />
@@ -239,7 +242,7 @@ const ApplicationDetailsPanel = ({
                             onClick={submitInternalNote}
                             className='mt-3 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200'
                         >
-                            {savingNote ? 'Publishing…' : 'Share with team'}
+                            {savingNote ? 'Publishing...' : 'Share with team'}
                         </button>
                     </div>
                 </div>

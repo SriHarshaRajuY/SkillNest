@@ -1,4 +1,7 @@
 import Joi from 'joi'
+import { PIPELINE_STAGES } from '../constants/pipeline.js'
+
+const objectId = Joi.string().hex().length(24)
 
 const schemas = {
     // ─── Recruiter ─────────────────────────────────────────────────────────────
@@ -23,19 +26,28 @@ const schemas = {
     }),
 
     updatePipeline: Joi.object({
-        id: Joi.string().required(),
-        pipelineStage: Joi.string().valid('Applied', 'Shortlisted', 'Interview', 'Technical', 'HR', 'Offer', 'Rejected').required()
+        id: objectId.required(),
+        pipelineStage: Joi.string().valid(...PIPELINE_STAGES).required()
     }),
 
     // ─── Candidate ─────────────────────────────────────────────────────────────
     applyJob: Joi.object({
-        jobId: Joi.string().required()
+        jobId: objectId.required()
     }),
 
     // ─── Messaging ─────────────────────────────────────────────────────────────
     sendMessage: Joi.object({
-        applicationId: Joi.string().required(),
+        applicationId: objectId.required(),
         content: Joi.string().trim().min(1).max(5000).required()
+    }),
+
+    internalNote: Joi.object({
+        content: Joi.string().trim().min(1).max(4000).required(),
+        rating: Joi.number().integer().min(1).max(5).optional()
+    }),
+
+    changeVisibility: Joi.object({
+        id: objectId.required()
     })
 }
 

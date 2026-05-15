@@ -6,14 +6,17 @@
  */
 const logger = {
     info: (message, meta = {}) => {
+        if (process.env.NODE_ENV === 'test') return
         const timestamp = new Date().toISOString()
         console.log(`[${timestamp}] INFO: ${message}`, Object.keys(meta).length ? meta : '')
     },
     warn: (message, meta = {}) => {
+        if (process.env.NODE_ENV === 'test') return
         const timestamp = new Date().toISOString()
         console.warn(`[${timestamp}] WARN: ${message}`, Object.keys(meta).length ? meta : '')
     },
     error: (message, error = {}) => {
+        if (process.env.NODE_ENV === 'test') return
         const timestamp = new Date().toISOString()
         const errorDetails = error instanceof Error ? { message: error.message, stack: error.stack } : error
         console.error(`[${timestamp}] ERROR: ${message}`, errorDetails)

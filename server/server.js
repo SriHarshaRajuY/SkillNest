@@ -29,7 +29,9 @@ app.disable('x-powered-by')
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }))
-app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'))
+if (config.nodeEnv !== 'test') {
+    app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'))
+}
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 const allowedOrigins = config.clientUrl.split(',').map(o => o.trim())

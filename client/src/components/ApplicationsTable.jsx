@@ -34,7 +34,7 @@ const ApplicationsTable = ({
                             onClick={() => setSelectedId(applicant._id)}
                         >
                             <td className='py-3 px-4 border-b text-center'>{index + 1}</td>
-                            <td className='py-3 px-4 border-b'>
+                            <td className='py-3 px-4 border-b min-w-[88px]'>
                                 <div className='flex items-center gap-2'>
                                     <img
                                         className='w-9 h-9 rounded-full object-cover max-sm:hidden'
@@ -69,11 +69,11 @@ const ApplicationsTable = ({
                                         Score
                                     </button>
                                 ) : matchResults[applicant._id].loading ? (
-                                    <span className='text-xs text-gray-400'>…</span>
+                                    <span className='text-xs text-gray-400'>...</span>
                                 ) : typeof matchResults[applicant._id].score === 'number' ? (
                                     <span className='text-xs font-bold text-indigo-700'>{matchResults[applicant._id].score}%</span>
                                 ) : (
-                                    <span className='text-xs text-red-500'>Err</span>
+                                    <span className='text-xs text-amber-600'>Retry</span>
                                 )}
                             </td>
                             <td className='py-3 px-4 border-b' onClick={(e) => e.stopPropagation()}>

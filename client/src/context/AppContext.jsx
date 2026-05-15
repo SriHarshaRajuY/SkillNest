@@ -26,6 +26,7 @@ export const AppContextProvider = ({ children }) => {
     const [userData, setUserData] = useState(null)
     const [userApplications, setUserApplications] = useState([])
     const [userDataLoaded, setUserDataLoaded] = useState(false)
+    const [apiOffline, setApiOffline] = useState(false)
 
     // ─── Fetch all public jobs ────────────────────────────────────────────────
     const fetchJobs = async () => {
@@ -33,11 +34,12 @@ export const AppContextProvider = ({ children }) => {
             const response = await jobService.getJobs()
             if (response.success) {
                 setJobs(response.data.jobs)
+                setApiOffline(false)
             } else {
                 toast.error(response.message)
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to load jobs')
+            setApiOffline(Boolean(error.isNetworkError))
         }
     }
 
@@ -47,14 +49,17 @@ export const AppContextProvider = ({ children }) => {
             const response = await authService.getRecruiterProfile()
             if (response.success) {
                 setCompanyData(response.data.company)
+                setApiOffline(false)
             }
         } catch (error) {
             if (error.status === 401) {
                 setCompanyToken(null)
+                setCompanyData(null)
                 localStorage.removeItem('companyToken')
-                toast.error('Session expired. Please login again.')
+            } else if (error.isNetworkError) {
+                setApiOffline(true)
             } else {
-                toast.error('Failed to load company data')
+                setCompanyData(null)
             }
         } finally {
             setCompanyLoaded(true)
@@ -68,9 +73,10 @@ export const AppContextProvider = ({ children }) => {
             const response = await authService.getCandidateProfile(token)
             if (response.success) {
                 setUserData(response.data.user)
+                setApiOffline(false)
             }
         } catch (error) {
-            console.error('[fetchUserData]', error.message)
+            setApiOffline(Boolean(error.isNetworkError))
         } finally {
             setUserDataLoaded(true)
         }
@@ -83,9 +89,10 @@ export const AppContextProvider = ({ children }) => {
             const response = await applicationService.getMyApplications({}, token)
             if (response.success) {
                 setUserApplications(response.data.applications)
+                setApiOffline(false)
             }
         } catch (error) {
-            toast.error('Failed to load applications')
+            setApiOffline(Boolean(error.isNetworkError))
         }
     }
 
@@ -132,6 +139,7 @@ export const AppContextProvider = ({ children }) => {
         userDataLoaded,
         fetchUserData,
         fetchUserApplications,
+        apiOffline,
     }
 
     return (

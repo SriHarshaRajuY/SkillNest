@@ -31,7 +31,7 @@ const Analytics = () => {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <h2 className="text-2xl font-bold text-gray-800">Recruiter Analytics</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Hiring Insights</h2>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

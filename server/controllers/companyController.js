@@ -4,7 +4,8 @@ import { v2 as cloudinary } from 'cloudinary'
 import mongoose from 'mongoose'
 import generateToken from '../utils/generateToken.js'
 import Job from '../models/Job.js'
-import JobApplication, { PIPELINE_STAGES } from '../models/JobApplication.js'
+import JobApplication from '../models/JobApplication.js'
+import { PIPELINE_STAGES } from '../constants/pipeline.js'
 import { emitToApplication } from '../realtime/socketHub.js'
 import { removeLocalFile } from '../utils/fileHelpers.js'
 import { fetchResumeBuffer } from './userController.js'
@@ -12,6 +13,12 @@ import aiService from '../services/aiService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
 import { cacheGet, cacheSet } from '../utils/redisClient.js'
 import logger from '../utils/logger.js'
+
+const sanitizeJobDescription = (html) => html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/javascript:/gi, '')
 
 // @desc    Register a new company
 // @route   POST /api/company/register
@@ -103,7 +110,7 @@ export const postJob = asyncHandler(async (req, res) => {
     const { title, description, location, salary, level, category } = req.body
     const companyId = req.company._id
 
-    const trimmedDescription = description.trim()
+    const trimmedDescription = sanitizeJobDescription(description.trim())
     if (!trimmedDescription || trimmedDescription === '<p><br></p>') {
         res.status(400)
         throw new Error('Please enter a job description')
@@ -301,20 +308,9 @@ export const matchResume = asyncHandler(async (req, res) => {
     const { applicationId } = req.params
     const companyId = req.company._id
 
-    const cacheKey = `match:${applicationId}`
-    let cached = await cacheGet(cacheKey).catch(() => null)
-    
-    if (cached) {
-        return res.json({ 
-            success: true, 
-            message: 'Match result fetched from cache',
-            data: { ...cached, cached: true } 
-        })
-    }
-
     const application = await JobApplication.findOne({ _id: applicationId, companyId })
-        .populate('userId', 'resume resumeAsset')
-        .populate('jobId', 'description')
+        .populate('userId', 'resume resumeAsset updatedAt')
+        .populate('jobId', 'description updatedAt')
 
     if (!application) {
         res.status(404)
@@ -326,19 +322,32 @@ export const matchResume = asyncHandler(async (req, res) => {
         throw new Error('No resume found for this applicant')
     }
 
+    const resumeVersion = application.userId?.resumeAsset?.publicId || application.userId?.resume || 'no-resume'
+    const jobVersion = application.jobId?.updatedAt?.getTime?.() || 'no-job-version'
+    const cacheKey = `match:${applicationId}:${resumeVersion}:${jobVersion}`
+    let cached = await cacheGet(cacheKey).catch(() => null)
+
+    if (cached) {
+        return res.json({
+            success: true,
+            message: 'Match result fetched from cache',
+            data: { ...cached, cached: true }
+        })
+    }
+
     const { buffer } = await fetchResumeBuffer(application.userId)
     const resumeText = await aiService.parsePDF(buffer)
     const result = await aiService.generateMatchScore(resumeText, application.jobId.description)
-    
+
     application.matchScore = result.score
     await application.save()
 
     await cacheSet(cacheKey, { score: result.score, reason: result.reason }).catch(() => null)
 
-    res.json({ 
-        success: true, 
+    res.json({
+        success: true,
         message: 'AI analysis completed',
-        data: { score: result.score, reason: result.reason } 
+        data: { score: result.score, reason: result.reason }
     })
 })
 
@@ -349,19 +358,8 @@ export const getResumeSummary = asyncHandler(async (req, res) => {
     const { applicationId } = req.params
     const companyId = req.company._id
 
-    const cacheKey = `summary:${applicationId}`
-    let cached = await cacheGet(cacheKey).catch(() => null)
-    
-    if (cached) {
-        return res.json({ 
-            success: true, 
-            message: 'Summary fetched from cache',
-            data: { ...cached, cached: true } 
-        })
-    }
-
     const application = await JobApplication.findOne({ _id: applicationId, companyId })
-        .populate('userId', 'resume resumeAsset')
+        .populate('userId', 'resume resumeAsset updatedAt')
 
     if (!application) {
         res.status(404)
@@ -371,6 +369,19 @@ export const getResumeSummary = asyncHandler(async (req, res) => {
     if (!application.userId?.resume) {
         res.status(400)
         throw new Error('No resume found for this applicant')
+    }
+
+    const resumeVersion = application.userId?.resumeAsset?.publicId || application.userId?.resume || 'no-resume'
+    const userVersion = application.userId?.updatedAt?.getTime?.() || 'no-user-version'
+    const cacheKey = `summary:${applicationId}:${resumeVersion}:${userVersion}`
+    let cached = await cacheGet(cacheKey).catch(() => null)
+
+    if (cached) {
+        return res.json({
+            success: true,
+            message: 'Summary fetched from cache',
+            data: { ...cached, cached: true }
+        })
     }
 
     const { buffer } = await fetchResumeBuffer(application.userId)

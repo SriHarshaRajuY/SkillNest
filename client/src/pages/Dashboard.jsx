@@ -5,6 +5,20 @@ import { AppContext } from '../context/AppContext'
 import SkillNestLogo from '../components/SkillNestLogo'
 import Loading from '../components/Loading'
 
+const SidebarMessageIcon = () => (
+    <svg viewBox='0 0 24 24' className='min-w-5 w-5 h-5 transition-transform group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
+        <path d='M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H9l-5 4v-4.5A2.5 2.5 0 0 1 2 13V6.5Z' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M7 8h10M7 12h6' strokeLinecap='round' />
+    </svg>
+)
+
+const SidebarInsightsIcon = () => (
+    <svg viewBox='0 0 24 24' className='min-w-5 w-5 h-5 transition-transform group-hover:scale-110' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
+        <path d='M4 19V5M4 19h16' strokeLinecap='round' strokeLinejoin='round' />
+        <path d='M8 16v-5M12 16V8M16 16v-8' strokeLinecap='round' />
+    </svg>
+)
+
 const Dashboard = () => {
     const navigate = useNavigate()
     const location = useLocation()
@@ -54,7 +68,7 @@ const Dashboard = () => {
                                             onClick={logout}
                                             className='px-5 py-3 cursor-pointer hover:bg-red-50 text-red-600 font-medium transition-colors flex items-center gap-2'
                                         >
-                                            <span aria-hidden>🚪</span> Logout
+                                            Logout
                                         </li>
                                     </ul>
                                 </div>
@@ -104,7 +118,7 @@ const Dashboard = () => {
                             }
                             to='/dashboard/messages'
                         >
-                            <span className='min-w-5 w-5 text-center text-xl transition-transform group-hover:scale-110' aria-hidden>💬</span>
+                            <SidebarMessageIcon />
                             <p className='max-sm:hidden text-sm font-semibold'>Messages</p>
                         </NavLink>
 
@@ -114,8 +128,8 @@ const Dashboard = () => {
                             }
                             to='/dashboard/analytics'
                         >
-                            <span className='min-w-5 w-5 text-center text-xl transition-transform group-hover:scale-110' aria-hidden>📊</span>
-                            <p className='max-sm:hidden text-sm font-semibold'>Analytics</p>
+                            <SidebarInsightsIcon />
+                            <p className='max-sm:hidden text-sm font-semibold'>Hiring Insights</p>
                         </NavLink>
                     </ul>
                 </aside>
