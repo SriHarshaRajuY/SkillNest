@@ -197,7 +197,7 @@ const ViewApplications = () => {
                         ? { ...a, matchScore: response.data.score }
                         : a
                 ))
-                toast.success('AI match explanation generated')
+                toast.success('Fit analysis generated')
             }
         } catch (error) {
             const message = error.message || 'Match score failed'
@@ -254,9 +254,9 @@ const ViewApplications = () => {
         <div className='max-w-7xl mx-auto animate-fade-in'>
             <div className='flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6'>
                 <div>
-                    <h1 className='text-3xl font-bold text-slate-900 tracking-tight'>Hiring Pipeline</h1>
+                    <h1 className='text-3xl font-bold text-slate-900 tracking-tight'>Applicant Pipeline</h1>
                     <p className='text-sm text-slate-500 mt-1 font-medium'>
-                        Filter, score, and move candidates through each stage with a clean recruiter workflow.
+                        Review applicants, compare fit signals, and move candidates through each hiring stage.
                     </p>
                 </div>
                 <div className='bg-slate-100 p-1 rounded-xl flex gap-1 self-start border border-slate-200 shadow-inner'>
@@ -284,7 +284,7 @@ const ViewApplications = () => {
                         <input
                             value={filters.search}
                             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                            placeholder='Candidate or job title'
+                            placeholder='Search candidate or role'
                             className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
                         />
                     </label>
@@ -327,7 +327,7 @@ const ViewApplications = () => {
                 </div>
                 <div className='mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3'>
                     <label className='flex items-center gap-3 text-sm text-slate-600'>
-                        <span className='font-semibold'>Minimum AI score</span>
+                        <span className='font-semibold'>Minimum fit score</span>
                         <input
                             type='number'
                             min='0'
@@ -366,9 +366,9 @@ const ViewApplications = () => {
             {validApplicants.length === 0 ? (
                 <div className='flex flex-col items-center justify-center h-[45vh] text-center animate-fade-in rounded-xl border border-dashed border-slate-200 bg-slate-50'>
                     <div className='w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 font-bold mb-4'>0</div>
-                    <h3 className='text-xl text-slate-800 font-bold'>No matching applications</h3>
+                    <h3 className='text-xl text-slate-800 font-bold'>No applicants match these filters</h3>
                     <p className='text-sm text-slate-400 mt-2 max-w-xs'>
-                        {hasActiveFilters ? 'Try relaxing the filters to see more candidates.' : 'Candidates applying for your roles will appear here.'}
+                        {hasActiveFilters ? 'Adjust your filters to broaden the applicant list.' : 'New applications will appear here as candidates apply.'}
                     </p>
                 </div>
             ) : (

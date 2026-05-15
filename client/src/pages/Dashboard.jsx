@@ -92,7 +92,7 @@ const Dashboard = () => {
                                 to='/dashboard/add-job'
                             >
                                 <img className={`min-w-5 w-5 transition-transform group-hover:scale-110`} src={assets.add_icon} alt='' />
-                                <p className='max-sm:hidden text-sm font-semibold'>Add Job</p>
+                                <p className='max-sm:hidden text-sm font-semibold'>Publish Role</p>
                             </NavLink>
                         )}
 
@@ -103,7 +103,7 @@ const Dashboard = () => {
                             to='/dashboard/manage-jobs'
                         >
                             <img className={`min-w-5 w-5 transition-transform group-hover:scale-110`} src={assets.home_icon} alt='' />
-                            <p className='max-sm:hidden text-sm font-semibold'>Manage Jobs</p>
+                            <p className='max-sm:hidden text-sm font-semibold'>Manage Roles</p>
                         </NavLink>
 
                         <NavLink
@@ -113,7 +113,7 @@ const Dashboard = () => {
                             to='/dashboard/view-applications'
                         >
                             <img className={`min-w-5 w-5 transition-transform group-hover:scale-110`} src={assets.person_tick_icon} alt='' />
-                            <p className='max-sm:hidden text-sm font-semibold'>View Applications</p>
+                            <p className='max-sm:hidden text-sm font-semibold'>Applicants</p>
                         </NavLink>
 
                         <NavLink

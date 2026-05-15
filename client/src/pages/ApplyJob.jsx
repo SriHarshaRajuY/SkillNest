@@ -51,24 +51,24 @@ const ApplyJob = () => {
 
       // Not logged in at all (Clerk)
       if (!user) {
-        toast.info('Please sign in to apply for this job')
+        toast.info('Sign in to apply for this role')
         openSignIn()
         return
       }
 
       // Still fetching profile from server
       if (!userDataLoaded) {
-        return toast.error('Loading your profile, please wait...')
+        return toast.error('Your profile is still loading. Please try again in a moment.')
       }
 
       // Profile loaded but null (server error - very rare)
       if (!userData) {
-        return toast.error('Could not load your profile. Please refresh the page.')
+        return toast.error('Could not load your candidate profile. Please refresh and try again.')
       }
 
       if (!userData.resume) {
         navigate('/applications')
-        return toast.error('Please upload your resume before applying')
+        return toast.error('Upload your resume before applying')
       }
 
       const token = await getToken()
@@ -148,18 +148,18 @@ const ApplyJob = () => {
                 onClick={applyHandler} 
                 className={`p-3.5 px-12 text-white rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${isAlreadyApplied ? 'bg-emerald-500 cursor-default' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
               >
-                {isAlreadyApplied ? 'Already Applied' : 'Apply Now'}
+                {isAlreadyApplied ? 'Application submitted' : 'Apply for this role'}
               </button>
               <p className='mt-3 text-slate-400 font-medium'>Posted {moment(JobData.date).fromNow()}</p>
               
               {/* AI Transparency Disclosure */}
               <div className='mt-6 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-left max-md:text-center'>
                 <div className='flex items-center gap-2 text-indigo-800 font-bold mb-2 justify-start max-md:justify-center'>
-                  <span className='text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest'>Ethical AI</span>
+                  <span className='text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-widest'>AI assisted</span>
                   <span className='w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 text-[10px] inline-flex items-center justify-center font-black'>i</span>
                 </div>
                 <p className='text-[12px] text-indigo-600 leading-relaxed font-medium'>
-                  Our AI analyzes matches fairly to help recruiters. All final decisions are human-verified.
+                  SkillNest provides fit signals to recruiters. Hiring decisions remain human-led.
                 </p>
               </div>
             </div>
@@ -174,13 +174,13 @@ const ApplyJob = () => {
                 onClick={applyHandler} 
                 className={`p-3.5 px-12 text-white rounded-2xl font-bold shadow-lg transition-all active:scale-95 mt-12 ${isAlreadyApplied ? 'bg-emerald-500 cursor-default' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
               >
-                {isAlreadyApplied ? 'Already Applied' : 'Apply Now'}
+                {isAlreadyApplied ? 'Application submitted' : 'Apply for this role'}
               </button>
             </div>
             
             {/* Right Section More Jobs */}
             <div className='w-full lg:w-1/3 mt-12 lg:mt-0 lg:ml-12'>
-              <h2 className='font-bold text-xl text-slate-900 mb-6'>More jobs from <span className='text-indigo-600'>{JobData.companyId.name}</span></h2>
+              <h2 className='font-bold text-xl text-slate-900 mb-6'>More roles from <span className='text-indigo-600'>{JobData.companyId.name}</span></h2>
               <div className='space-y-6'>
                 {jobs.filter(job => job._id !== JobData._id && job.companyId._id === JobData.companyId._id)
                   .filter(job => {

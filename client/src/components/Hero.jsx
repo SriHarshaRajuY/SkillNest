@@ -25,10 +25,10 @@ const Hero = () => {
             <div className='relative bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white py-20 text-center mx-2 rounded-2xl overflow-hidden shadow-2xl'>
                 <div className='relative z-10'>
                     <h2 className='text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight text-white'>
-                        Find roles and track every application
+                        Discover roles and manage every application
                     </h2>
                     <p className='mb-10 max-w-2xl mx-auto text-base md:text-lg font-light text-gray-200 px-5'>
-                        SkillNest connects candidates and recruiters through secure resumes, live hiring stages, and focused communication.
+                        SkillNest gives candidates a clear application timeline and gives recruiters a secure workflow for reviewing talent.
                     </p>
                     
                     <div className='glass flex flex-col sm:flex-row items-center justify-between rounded-xl text-gray-800 max-w-2xl mx-4 sm:mx-auto p-2 shadow-lg transition-transform hover:scale-[1.01] duration-300'>
@@ -36,7 +36,7 @@ const Hero = () => {
                             <img className='h-5 opacity-70' src={assets.search_icon} alt='' />
                             <input
                                 type='text'
-                                placeholder='Search for jobs'
+                                placeholder='Job title, skill, or company'
                                 className='bg-transparent max-sm:text-sm p-2 rounded outline-none w-full placeholder-gray-500 font-medium'
                                 ref={titleRef}
                                 onKeyDown={handleKeyDown}
@@ -46,7 +46,7 @@ const Hero = () => {
                             <img className='h-5 opacity-70' src={assets.location_icon} alt='' />
                             <input
                                 type='text'
-                                placeholder='Location'
+                                placeholder='City or remote preference'
                                 className='bg-transparent max-sm:text-sm p-2 rounded outline-none w-full placeholder-gray-500 font-medium'
                                 ref={locationRef}
                                 onKeyDown={handleKeyDown}
@@ -56,7 +56,7 @@ const Hero = () => {
                             onClick={onSearch} 
                             className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition-all px-8 py-3 rounded-lg text-white font-semibold m-1 shadow-md w-full sm:w-auto hover:-translate-y-0.5 active:translate-y-0'
                         >
-                            Search
+                            Search jobs
                         </button>
                     </div>
                 </div>

@@ -62,7 +62,7 @@ const ApplicationCard = ({
                                 disabled={!canReview}
                                 className='text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1.5 rounded-md hover:bg-indigo-100 border border-indigo-100 shadow-sm transition-all flex items-center gap-1 font-medium'
                             >
-                                AI Match
+                                Analyze fit
                             </button>
                         ) : matchResults[applicant._id].loading ? (
                             <span className='text-[10px] text-gray-500'>Analyzing...</span>
@@ -76,7 +76,7 @@ const ApplicationCard = ({
                                 )}
                             </div>
                         ) : (
-                            <span className='text-xs text-red-500'>AI error</span>
+                            <span className='text-xs text-red-500'>Analysis failed</span>
                         )}
                     </div>
 

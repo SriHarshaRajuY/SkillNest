@@ -92,7 +92,7 @@ const ApplicationDetailsPanel = ({
             <div className='mb-6 bg-white border border-slate-200 rounded-xl p-4 shadow-sm'>
                 <div className='flex items-center justify-between gap-3 mb-3'>
                     <div>
-                        <p className='text-xs font-bold uppercase tracking-widest text-slate-500'>AI Match Explanation</p>
+                        <p className='text-xs font-bold uppercase tracking-widest text-slate-500'>Fit analysis explanation</p>
                         <p className='text-sm text-slate-500 mt-1'>{selectedMatch.recommendation || 'Review manually'}</p>
                     </div>
                     <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-black ${
@@ -142,7 +142,7 @@ const ApplicationDetailsPanel = ({
             <div className='mt-6 border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in'>
                 <div className='p-4 bg-gray-50 border-b flex justify-between items-center'>
                     <div>
-                        <p className='text-xs font-semibold text-gray-500 uppercase tracking-tight'>Team Hiring Room</p>
+                        <p className='text-xs font-semibold text-gray-500 uppercase tracking-tight'>Candidate review</p>
                         <p className='font-bold text-gray-900'>{selectedApplicant.userId.name}</p>
                     </div>
                     <button type='button' className='text-sm text-gray-500 hover:text-gray-800' onClick={() => setSelectedId(null)}>Dismiss</button>
@@ -156,14 +156,14 @@ const ApplicationDetailsPanel = ({
                             to={`/dashboard/messages/${selectedApplicant._id}`}
                             className='inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all'
                         >
-                            Open secure chat
+                        Open conversation
                         </Link>
                     </div>
                     <div>
-                        <p className='text-xs font-semibold text-gray-500 uppercase mb-3 tracking-tight'>Internal Feed</p>
+                        <p className='text-xs font-semibold text-gray-500 uppercase mb-3 tracking-tight'>Internal notes</p>
                         <div className='space-y-3 max-h-64 overflow-y-auto pr-2 mb-4'>
                             {(selectedApplicant.internalNotes || []).length === 0 && (
-                                <p className='text-sm text-gray-400 italic'>No internal notes yet.</p>
+                                <p className='text-sm text-gray-400 italic'>No recruiter notes have been added yet.</p>
                             )}
                             {[...(selectedApplicant.internalNotes || [])].reverse().map((n) => (
                                 <div key={n._id} className='rounded-xl border border-gray-100 p-3 bg-slate-50 shadow-sm'>
@@ -176,7 +176,7 @@ const ApplicationDetailsPanel = ({
                             ))}
                         </div>
                         <div className='border-t pt-4'>
-                            <p className='text-xs font-semibold text-gray-500 uppercase mb-2 tracking-tight'>Add Assessment</p>
+                            <p className='text-xs font-semibold text-gray-500 uppercase mb-2 tracking-tight'>Add recruiter note</p>
                             <div className='flex gap-2 mb-2'>
                                 <select
                                     value={noteRating}
@@ -191,7 +191,7 @@ const ApplicationDetailsPanel = ({
                                     type="text"
                                     value={noteBody}
                                     onChange={(e) => setNoteBody(e.target.value)}
-                                    placeholder='Team feedback...'
+                                    placeholder='Share concise review notes'
                                     className='flex-1 border rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none'
                                 />
                                 <button
@@ -215,7 +215,7 @@ const ApplicationDetailsPanel = ({
             <div className='p-5 border-b bg-gradient-to-br from-slate-900 to-indigo-900 text-white'>
                 <div className='flex justify-between items-start'>
                     <div>
-                        <p className='text-[10px] uppercase tracking-widest text-white/60 font-bold'>Team Hiring Room</p>
+                        <p className='text-[10px] uppercase tracking-widest text-white/60 font-bold'>Candidate review</p>
                         <p className='font-bold text-xl truncate mt-0.5'>{selectedApplicant.userId.name}</p>
                         <p className='text-sm text-white/70 truncate'>{selectedApplicant.jobId.title}</p>
                     </div>
@@ -232,7 +232,7 @@ const ApplicationDetailsPanel = ({
                         to={`/dashboard/messages/${selectedApplicant._id}`}
                         className='flex-1 text-center bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-xs font-bold py-2 rounded-lg transition-all border border-white/10'
                     >
-                        Chat
+                        Conversation
                     </Link>
                     <button
                         type='button'
@@ -251,13 +251,13 @@ const ApplicationDetailsPanel = ({
 
                 <div>
                     <div className='flex justify-between items-center mb-3'>
-                        <p className='text-xs font-bold text-slate-400 uppercase tracking-widest'>Team Notes</p>
+                        <p className='text-xs font-bold text-slate-400 uppercase tracking-widest'>Internal notes</p>
                         <span className='text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold'>Internal</span>
                     </div>
                     <div className='space-y-4'>
                         {(selectedApplicant.internalNotes || []).length === 0 && (
                             <div className='py-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200'>
-                                <p className='text-xs text-slate-400 italic'>No feedback shared yet.</p>
+                                <p className='text-xs text-slate-400 italic'>No recruiter notes have been added yet.</p>
                             </div>
                         )}
                         {[...(selectedApplicant.internalNotes || [])].reverse().map((n) => (
@@ -278,7 +278,7 @@ const ApplicationDetailsPanel = ({
                 </div>
 
                 <div className='border-t border-slate-100 pt-5'>
-                    <p className='text-xs font-bold text-slate-400 uppercase tracking-widest mb-3'>Post Feedback</p>
+                    <p className='text-xs font-bold text-slate-400 uppercase tracking-widest mb-3'>Add recruiter note</p>
                     <div className='bg-slate-50 p-4 rounded-2xl border border-slate-200'>
                         <div className='flex items-center gap-3 mb-3'>
                             <label className='text-xs font-bold text-slate-500'>Score</label>
@@ -298,7 +298,7 @@ const ApplicationDetailsPanel = ({
                         <textarea
                             value={noteBody}
                             onChange={(e) => setNoteBody(e.target.value)}
-                            placeholder='Team feedback...'
+                            placeholder='Share concise review notes'
                             rows={3}
                             className='w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none transition-all'
                         />
@@ -308,7 +308,7 @@ const ApplicationDetailsPanel = ({
                             onClick={submitInternalNote}
                             className='mt-3 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200'
                         >
-                            {savingNote ? 'Publishing...' : 'Share with team'}
+                            {savingNote ? 'Saving note...' : 'Save internal note'}
                         </button>
                     </div>
                 </div>

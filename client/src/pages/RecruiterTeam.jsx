@@ -5,6 +5,7 @@ import { AppContext } from '../context/AppContext'
 import { recruiterService } from '../services/recruiterService'
 
 const emptyForm = { name: '', email: '', password: '', role: 'Recruiter' }
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const roleCopy = {
     Admin: 'Can manage jobs, team members, audit logs, and all recruiter workflows.',
     Recruiter: 'Can review candidates, move pipeline stages, run AI analysis, and message candidates.',
@@ -15,6 +16,7 @@ const RecruiterTeam = () => {
     const { companyData } = useContext(AppContext)
     const [members, setMembers] = useState(null)
     const [form, setForm] = useState(emptyForm)
+    const [formErrors, setFormErrors] = useState({})
     const [saving, setSaving] = useState(false)
     const role = companyData?.currentRecruiter?.role || 'Admin'
 
@@ -36,16 +38,30 @@ const RecruiterTeam = () => {
 
     const createMember = async (e) => {
         e.preventDefault()
+        const nextErrors = {}
+        if (form.name.trim().length < 2) nextErrors.name = 'Enter the recruiter name.'
+        if (!emailPattern.test(form.email.trim())) nextErrors.email = 'Enter a valid work email.'
+        if (form.password.length < 8 || !/[a-z]/.test(form.password) || !/[A-Z]/.test(form.password) || !/\d/.test(form.password)) {
+            nextErrors.password = 'Use at least 8 characters with uppercase, lowercase, and a number.'
+        }
+        setFormErrors(nextErrors)
+        if (Object.keys(nextErrors).length > 0) return
+
         try {
             setSaving(true)
-            const response = await recruiterService.createTeamMember(form)
+            const response = await recruiterService.createTeamMember({
+                ...form,
+                name: form.name.trim(),
+                email: form.email.trim(),
+            })
             if (response.success) {
-                toast.success('Team member added')
+                toast.success('Recruiter account created')
                 setMembers((prev) => [...prev, response.data.member])
                 setForm(emptyForm)
+                setFormErrors({})
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to add team member')
+            toast.error(error.errors?.[0] || error.message || 'Could not create recruiter account')
         } finally {
             setSaving(false)
         }
@@ -56,10 +72,10 @@ const RecruiterTeam = () => {
             const response = await recruiterService.updateTeamMember(memberId, changes)
             if (response.success) {
                 setMembers((prev) => prev.map((m) => String(m._id) === String(memberId) ? response.data.member : m))
-                toast.success('Team member updated')
+                toast.success('Recruiter access updated')
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to update team member')
+            toast.error(error.message || 'Could not update recruiter access')
         }
     }
 
@@ -152,19 +168,28 @@ const RecruiterTeam = () => {
 
                 <aside className='space-y-5'>
                     <form onSubmit={createMember} className='rounded-xl border border-slate-200 bg-white p-5 shadow-sm'>
-                        <h2 className='font-black text-slate-900'>Add Recruiter</h2>
-                        <p className='text-sm text-slate-500 mt-1 mb-4'>Create an account with a scoped role.</p>
+                        <h2 className='font-black text-slate-900'>Invite Recruiter</h2>
+                        <p className='text-sm text-slate-500 mt-1 mb-4'>Create a scoped account for a teammate.</p>
                         <div className='space-y-3'>
-                            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder='Full name' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
-                            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder='Work email' type='email' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
-                            <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder='Temporary password' type='password' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
+                            <div>
+                                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder='Recruiter name' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
+                                {formErrors.name && <p className='mt-1 text-xs font-semibold text-rose-600'>{formErrors.name}</p>}
+                            </div>
+                            <div>
+                                <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder='recruiter@company.com' type='email' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
+                                {formErrors.email && <p className='mt-1 text-xs font-semibold text-rose-600'>{formErrors.email}</p>}
+                            </div>
+                            <div>
+                                <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder='Temporary password' type='password' className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100' />
+                                {formErrors.password && <p className='mt-1 text-xs font-semibold text-rose-600'>{formErrors.password}</p>}
+                            </div>
                             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className='w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'>
                                 <option value='Admin'>Admin</option>
                                 <option value='Recruiter'>Recruiter</option>
                                 <option value='Viewer'>Viewer</option>
                             </select>
                             <button disabled={saving} className='w-full rounded-lg bg-blue-600 py-2.5 font-black text-white hover:bg-blue-700 disabled:opacity-60'>
-                                {saving ? 'Adding...' : 'Add member'}
+                                {saving ? 'Creating account...' : 'Create recruiter account'}
                             </button>
                         </div>
                     </form>

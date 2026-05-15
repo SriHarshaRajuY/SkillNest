@@ -1,5 +1,7 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
+import Quill from 'quill'
 import moment from 'moment'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
 import { toast } from 'react-toastify'
@@ -22,6 +24,8 @@ const ManageJobs = () => {
     const [editingJob, setEditingJob] = useState(null)
     const [editForm, setEditForm] = useState(emptyEditForm)
     const [savingEdit, setSavingEdit] = useState(false)
+    const editEditorRef = useRef(null)
+    const editQuillRef = useRef(null)
     const { companyToken, companyData } = useContext(AppContext)
     const isAdmin = (companyData?.currentRecruiter?.role || 'Admin') === 'Admin'
 
@@ -35,7 +39,7 @@ const ManageJobs = () => {
                 setJobs([])
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to fetch jobs')
+            toast.error(error.message || 'Could not load company roles')
             setJobs([])
         }
     }
@@ -51,12 +55,11 @@ const ManageJobs = () => {
                 toast.error(response.message)
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to change visibility')
+            toast.error(error.message || 'Could not update role visibility')
         }
     }
 
     const startEdit = (job) => {
-        setEditingJob(job)
         setEditForm({
             title: job.title || '',
             description: job.description || '',
@@ -65,14 +68,23 @@ const ManageJobs = () => {
             level: job.level || 'Beginner level',
             salary: job.salary || '',
         })
+        setEditingJob(job)
+    }
+
+    const closeEdit = () => {
+        editQuillRef.current = null
+        setEditingJob(null)
     }
 
     const saveEdit = async (e) => {
         e.preventDefault()
         if (!editingJob) return
 
-        if (!editForm.title.trim() || !editForm.description.trim() || Number(editForm.salary) <= 0) {
-            toast.error('Please complete title, description, and salary.')
+        const description = editQuillRef.current?.root.innerHTML.trim() || editForm.description.trim()
+        const plainDescription = editQuillRef.current?.getText().trim() || description.replace(/<[^>]+>/g, '').trim()
+
+        if (!editForm.title.trim() || !plainDescription || Number(editForm.salary) <= 0) {
+            toast.error('Complete the role title, description, and monthly compensation.')
             return
         }
 
@@ -81,21 +93,21 @@ const ManageJobs = () => {
             const response = await recruiterService.updateJob(editingJob._id, {
                 ...editForm,
                 title: editForm.title.trim(),
-                description: editForm.description.trim(),
+                description,
                 salary: Number(editForm.salary),
             })
 
             if (response.success) {
-                toast.success('Job updated')
+                toast.success('Role updated')
                 setJobs((prev) => prev.map((job) =>
                     String(job._id) === String(editingJob._id)
                         ? { ...job, ...response.data.job, applicants: job.applicants }
                         : job
                 ))
-                setEditingJob(null)
+                closeEdit()
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to update job')
+            toast.error(error.message || 'Could not update role')
         } finally {
             setSavingEdit(false)
         }
@@ -107,29 +119,153 @@ const ManageJobs = () => {
         }
     }, [companyToken])
 
+    useEffect(() => {
+        if (!editingJob || !editEditorRef.current) return undefined
+
+        editQuillRef.current = new Quill(editEditorRef.current, {
+            theme: 'snow',
+            placeholder: 'Update responsibilities, requirements, benefits, and interview expectations.',
+        })
+        editQuillRef.current.clipboard.dangerouslyPasteHTML(editForm.description || '')
+
+        return () => {
+            editQuillRef.current = null
+        }
+    }, [editingJob?._id])
+
+    useEffect(() => {
+        if (!editingJob) return undefined
+
+        const previousOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        return () => {
+            document.body.style.overflow = previousOverflow
+        }
+    }, [editingJob])
+
     if (jobs === null) return <Loading />
 
     if (jobs.length === 0) return (
         <div className='flex flex-col items-center justify-center h-[70vh] text-center px-6 animate-fade-in'>
             <div className='w-16 h-16 mb-4 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-2xl'>+</div>
-            <h2 className='text-2xl font-bold text-slate-800 mb-2'>No Jobs Posted Yet</h2>
+            <h2 className='text-2xl font-bold text-slate-800 mb-2'>No Roles Published Yet</h2>
             <p className='text-slate-500 max-w-sm mb-8'>{isAdmin ? 'Create your first listing to start receiving applications.' : 'Admin recruiters can create the first listing.'}</p>
             {isAdmin && (
                 <button
                     onClick={() => navigate('/dashboard/add-job')}
                     className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-all shadow-lg hover:-translate-y-1'
                 >
-                    Post Your First Job
+                    Publish First Role
                 </button>
             )}
         </div>
     )
 
+    const editModal = editingJob ? createPortal(
+        <div className='fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm'>
+            <form onSubmit={saveEdit} className='flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl'>
+                <div className='flex items-start justify-between gap-5 border-b border-slate-100 bg-white px-6 py-5'>
+                    <div>
+                        <p className='text-xs font-black uppercase tracking-widest text-blue-600'>Edit role</p>
+                        <h3 className='mt-1 text-2xl font-black text-slate-900'>{editingJob.title}</h3>
+                        <p className='mt-1 text-sm text-slate-500'>Update role details, compensation, visibility context, and description.</p>
+                    </div>
+                    <button
+                        type='button'
+                        onClick={closeEdit}
+                        className='rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div className='flex-1 overflow-y-auto bg-slate-50/60 px-6 py-6'>
+                    <div className='grid grid-cols-1 gap-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-4'>
+                        <label className='lg:col-span-4'>
+                            <span className='text-sm font-bold text-slate-700'>Role title</span>
+                            <input
+                                value={editForm.title}
+                                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                            />
+                        </label>
+
+                        <label className='lg:col-span-2'>
+                            <span className='text-sm font-bold text-slate-700'>Category</span>
+                            <select
+                                value={editForm.category}
+                                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                                className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                            >
+                                {JobCategories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                        </label>
+
+                        <label className='lg:col-span-2'>
+                            <span className='text-sm font-bold text-slate-700'>Location</span>
+                            <select
+                                value={editForm.location}
+                                onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                                className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                            >
+                                {JobLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
+                            </select>
+                        </label>
+
+                        <label className='lg:col-span-2'>
+                            <span className='text-sm font-bold text-slate-700'>Experience level</span>
+                            <select
+                                value={editForm.level}
+                                onChange={(e) => setEditForm({ ...editForm, level: e.target.value })}
+                                className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                            >
+                                <option value='Beginner level'>Beginner</option>
+                                <option value='Intermediate level'>Intermediate</option>
+                                <option value='Senior level'>Senior</option>
+                            </select>
+                        </label>
+
+                        <label className='lg:col-span-2'>
+                            <span className='text-sm font-bold text-slate-700'>Salary per month</span>
+                            <input
+                                min={1}
+                                type='number'
+                                value={editForm.salary}
+                                onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
+                                className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                            />
+                        </label>
+
+                        <div className='lg:col-span-4'>
+                            <div className='mb-2 flex items-center justify-between gap-3'>
+                                <span className='text-sm font-bold text-slate-700'>Role description</span>
+                                <span className='text-xs font-semibold text-slate-400'>Rich text editor</span>
+                            </div>
+                            <div className='overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100'>
+                                <div ref={editEditorRef} className='min-h-[300px]' />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className='flex flex-col-reverse gap-3 border-t border-slate-100 bg-white px-6 py-4 sm:flex-row sm:justify-end'>
+                    <button type='button' onClick={closeEdit} className='rounded-lg border border-slate-200 px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-50'>
+                        Cancel
+                    </button>
+                    <button disabled={savingEdit} className='rounded-lg bg-blue-600 px-6 py-2.5 font-black text-white hover:bg-blue-700 disabled:opacity-60'>
+                        {savingEdit ? 'Saving changes...' : 'Save changes'}
+                    </button>
+                </div>
+            </form>
+        </div>,
+        document.body,
+    ) : null
+
     return (
         <div className='container p-4 max-w-6xl animate-fade-in'>
             <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8'>
                 <div>
-                    <h2 className='text-2xl font-bold text-slate-900'>Manage Jobs</h2>
+                    <h2 className='text-2xl font-bold text-slate-900'>Manage Roles</h2>
                     <p className='text-slate-500 text-sm font-medium'>{jobs.length} listings across active and hidden roles</p>
                 </div>
                 {isAdmin && (
@@ -137,7 +273,7 @@ const ManageJobs = () => {
                         onClick={() => navigate('/dashboard/add-job')}
                         className='bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-5 rounded-lg transition-all font-bold text-sm shadow-md hover:scale-[1.02]'
                     >
-                        + Add New Job
+                        + New Role
                     </button>
                 )}
             </div>
@@ -147,7 +283,7 @@ const ManageJobs = () => {
                     <thead className='bg-slate-50/80 border-b border-slate-100'>
                         <tr>
                             <th className='py-4 px-6 text-left font-bold text-slate-700 text-xs uppercase tracking-wider max-sm:hidden'>#</th>
-                            <th className='py-4 px-6 text-left font-bold text-slate-700 text-xs uppercase tracking-wider'>Job Title</th>
+                            <th className='py-4 px-6 text-left font-bold text-slate-700 text-xs uppercase tracking-wider'>Role</th>
                             <th className='py-4 px-6 text-left font-bold text-slate-700 text-xs uppercase tracking-wider max-sm:hidden'>Posted</th>
                             <th className='py-4 px-6 text-left font-bold text-slate-700 text-xs uppercase tracking-wider max-sm:hidden'>Location</th>
                             <th className='py-4 px-6 text-center font-bold text-slate-700 text-xs uppercase tracking-wider'>Applicants</th>
@@ -199,101 +335,7 @@ const ManageJobs = () => {
                 </table>
             </div>
 
-            {editingJob && (
-                <div className='fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center px-4'>
-                    <form onSubmit={saveEdit} className='w-full max-w-3xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden'>
-                        <div className='px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-4'>
-                            <div>
-                                <p className='text-xs font-bold uppercase tracking-widest text-blue-600'>Edit role</p>
-                                <h3 className='text-xl font-bold text-slate-900 mt-1'>{editingJob.title}</h3>
-                            </div>
-                            <button
-                                type='button'
-                                onClick={() => setEditingJob(null)}
-                                className='rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 hover:bg-slate-50'
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div className='p-6 grid grid-cols-1 md:grid-cols-2 gap-5 max-h-[72vh] overflow-y-auto'>
-                            <label className='md:col-span-2'>
-                                <span className='text-sm font-semibold text-slate-700'>Job title</span>
-                                <input
-                                    value={editForm.title}
-                                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                />
-                            </label>
-
-                            <label>
-                                <span className='text-sm font-semibold text-slate-700'>Category</span>
-                                <select
-                                    value={editForm.category}
-                                    onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                >
-                                    {JobCategories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                                </select>
-                            </label>
-
-                            <label>
-                                <span className='text-sm font-semibold text-slate-700'>Location</span>
-                                <select
-                                    value={editForm.location}
-                                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                >
-                                    {JobLocations.map((loc) => <option key={loc} value={loc}>{loc}</option>)}
-                                </select>
-                            </label>
-
-                            <label>
-                                <span className='text-sm font-semibold text-slate-700'>Experience level</span>
-                                <select
-                                    value={editForm.level}
-                                    onChange={(e) => setEditForm({ ...editForm, level: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                >
-                                    <option value='Beginner level'>Beginner</option>
-                                    <option value='Intermediate level'>Intermediate</option>
-                                    <option value='Senior level'>Senior</option>
-                                </select>
-                            </label>
-
-                            <label>
-                                <span className='text-sm font-semibold text-slate-700'>Salary per month</span>
-                                <input
-                                    min={1}
-                                    type='number'
-                                    value={editForm.salary}
-                                    onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
-                                />
-                            </label>
-
-                            <label className='md:col-span-2'>
-                                <span className='text-sm font-semibold text-slate-700'>Description</span>
-                                <textarea
-                                    rows={8}
-                                    value={editForm.description}
-                                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y'
-                                />
-                            </label>
-                        </div>
-
-                        <div className='px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3'>
-                            <button type='button' onClick={() => setEditingJob(null)} className='px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-white'>
-                                Cancel
-                            </button>
-                            <button disabled={savingEdit} className='px-5 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60'>
-                                {savingEdit ? 'Saving...' : 'Save changes'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            {editModal}
         </div>
     )
 }

@@ -2,18 +2,42 @@ import Joi from 'joi'
 import { RECRUITER_PIPELINE_STAGES } from '../constants/pipeline.js'
 
 const objectId = Joi.string().hex().length(24)
+const strongPassword = Joi.string()
+    .min(8)
+    .max(100)
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/)
+    .messages({
+        'string.empty': 'Password is required.',
+        'string.min': 'Password must be at least 8 characters.',
+        'string.max': 'Password must be 100 characters or fewer.',
+        'string.pattern.base': 'Password must include uppercase, lowercase, and a number.',
+    })
 
 const schemas = {
     // ─── Recruiter ─────────────────────────────────────────────────────────────
     recruiterRegister: Joi.object({
-        name: Joi.string().trim().min(2).max(100).required(),
-        email: Joi.string().email().lowercase().trim().required(),
-        password: Joi.string().min(8).max(100).required()
+        name: Joi.string().trim().min(2).max(100).required().messages({
+            'string.empty': 'Company name is required.',
+            'string.min': 'Company name must be at least 2 characters.',
+            'string.max': 'Company name must be 100 characters or fewer.',
+        }),
+        email: Joi.string().email({ tlds: { allow: false } }).lowercase().trim().required().messages({
+            'string.empty': 'Work email is required.',
+            'string.email': 'Enter a valid work email address.',
+        }),
+        password: strongPassword.required()
     }),
 
     recruiterLogin: Joi.object({
-        email: Joi.string().email().lowercase().trim().required(),
-        password: Joi.string().required()
+        email: Joi.string().email({ tlds: { allow: false } }).lowercase().trim().required().messages({
+            'string.empty': 'Work email is required.',
+            'string.email': 'Enter a valid work email address.',
+        }),
+        password: Joi.string().min(8).max(100).required().messages({
+            'string.empty': 'Password is required.',
+            'string.min': 'Password must be at least 8 characters.',
+            'string.max': 'Password must be 100 characters or fewer.',
+        })
     }),
 
     postJob: Joi.object({
@@ -40,9 +64,16 @@ const schemas = {
     }),
 
     createTeamMember: Joi.object({
-        name: Joi.string().trim().min(2).max(100).required(),
-        email: Joi.string().email().lowercase().trim().required(),
-        password: Joi.string().min(8).max(100).required(),
+        name: Joi.string().trim().min(2).max(100).required().messages({
+            'string.empty': 'Recruiter name is required.',
+            'string.min': 'Recruiter name must be at least 2 characters.',
+            'string.max': 'Recruiter name must be 100 characters or fewer.',
+        }),
+        email: Joi.string().email({ tlds: { allow: false } }).lowercase().trim().required().messages({
+            'string.empty': 'Work email is required.',
+            'string.email': 'Enter a valid work email address.',
+        }),
+        password: strongPassword.required(),
         role: Joi.string().valid('Admin', 'Recruiter', 'Viewer').required()
     }),
 

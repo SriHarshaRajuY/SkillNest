@@ -15,7 +15,7 @@ const JobCard = ({ job, isSaved = false, onSavedChange }) => {
 
   const handleApplyClick = () => {
     if (!user) {
-      toast.info('Please sign in to apply for this job')
+      toast.info('Sign in to apply for this role')
       openSignIn()
       return
     }
@@ -31,7 +31,7 @@ const JobCard = ({ job, isSaved = false, onSavedChange }) => {
   const handleSaveClick = async (e) => {
     e.stopPropagation()
     if (!user) {
-      toast.info('Please sign in to save jobs')
+      toast.info('Sign in to save roles')
       openSignIn()
       return
     }
@@ -41,14 +41,14 @@ const JobCard = ({ job, isSaved = false, onSavedChange }) => {
       if (isSaved) {
         await applicationService.unsaveJob(job._id, token)
         onSavedChange?.(job._id, false)
-        toast.success('Removed from saved jobs')
+        toast.success('Removed from saved roles')
       } else {
         await applicationService.saveJob(job._id, token)
         onSavedChange?.(job._id, true)
-        toast.success('Job saved')
+        toast.success('Role saved')
       }
     } catch (error) {
-      toast.error(error.message || 'Could not update saved job')
+      toast.error(error.message || 'Could not update saved role')
     }
   }
 
@@ -117,13 +117,13 @@ const JobCard = ({ job, isSaved = false, onSavedChange }) => {
           onClick={handleApplyClick} 
           className='flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md hover:shadow-indigo-200 active:scale-95'
         >
-          Apply Now
+          Apply
         </button>
         <button 
           onClick={handleLearnMoreClick} 
           className='flex-1 bg-white text-slate-600 border border-slate-200 font-bold py-2.5 rounded-xl hover:bg-slate-50 transition-all active:scale-95'
         >
-          Learn More
+          View Details
         </button>
       </div>
     </div>

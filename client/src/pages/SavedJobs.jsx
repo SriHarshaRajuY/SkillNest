@@ -30,7 +30,7 @@ const SavedJobs = () => {
                 setSavedJobIds(response.data.savedJobIds || [])
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to load saved jobs')
+            toast.error(error.message || 'Could not load saved roles')
         } finally {
             setLoading(false)
         }
@@ -51,7 +51,7 @@ const SavedJobs = () => {
                 <Navbar />
                 <main className='min-h-[60vh] flex flex-col items-center justify-center text-center px-4'>
                     <h1 className='text-2xl font-black text-slate-900'>Save roles you want to revisit</h1>
-                    <p className='text-slate-500 mt-2 mb-6 max-w-md'>Sign in to bookmark jobs and receive better recommendations.</p>
+                    <p className='text-slate-500 mt-2 mb-6 max-w-md'>Sign in to bookmark roles and receive more relevant recommendations.</p>
                     <button onClick={() => openSignIn()} className='rounded-lg bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700'>
                         Sign in
                     </button>
@@ -66,7 +66,7 @@ const SavedJobs = () => {
             <Navbar />
             <main className='container 2xl:px-20 mx-auto px-4 py-10 min-h-[65vh]'>
                 <div className='mb-8'>
-                    <h1 className='text-3xl font-black text-slate-900'>Saved Jobs</h1>
+                    <h1 className='text-3xl font-black text-slate-900'>Saved Roles</h1>
                     <p className='text-slate-500 mt-1'>Your shortlist of roles to compare and apply later.</p>
                 </div>
 
@@ -83,8 +83,8 @@ const SavedJobs = () => {
                     </div>
                 ) : (
                     <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-20 text-center'>
-                        <h2 className='text-xl font-black text-slate-800'>No saved jobs yet</h2>
-                        <p className='text-slate-500 mt-2'>Use the save button on job cards to build your shortlist.</p>
+                        <h2 className='text-xl font-black text-slate-800'>No saved roles yet</h2>
+                        <p className='text-slate-500 mt-2'>Use the save action on role cards to build your shortlist.</p>
                     </div>
                 )}
             </main>

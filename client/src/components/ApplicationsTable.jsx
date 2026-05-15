@@ -23,7 +23,7 @@ const ApplicationsTable = ({
                         <th className='py-3 px-4 text-left font-medium text-gray-700'>Applicant</th>
                         <th className='py-3 px-4 text-left font-medium text-gray-700 max-sm:hidden'>Job</th>
                         <th className='py-3 px-4 text-left font-medium text-gray-700'>Resume</th>
-                        <th className='py-3 px-4 text-left font-medium text-gray-700'>AI Match</th>
+                        <th className='py-3 px-4 text-left font-medium text-gray-700'>Fit Analysis</th>
                         <th className='py-3 px-4 text-left font-medium text-gray-700'>Pipeline</th>
                         <th className='py-3 px-4 text-left font-medium text-gray-700'>Chat</th>
                     </tr>
@@ -75,7 +75,7 @@ const ApplicationsTable = ({
                                         disabled={!canReview}
                                         className='text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-100 transition-colors'
                                     >
-                                        Analyze
+                                        Analyze fit
                                     </button>
                                 ) : matchResults[applicant._id].loading ? (
                                     <span className='text-xs text-gray-400'>Analyzing...</span>
@@ -97,7 +97,7 @@ const ApplicationsTable = ({
                                         )}
                                     </div>
                                 ) : (
-                                    <span className='text-xs text-amber-600'>Retry</span>
+                                    <span className='text-xs text-amber-600'>Try again</span>
                                 )}
                             </td>
                             <td className='py-3 px-4 border-b' onClick={(e) => e.stopPropagation()}>

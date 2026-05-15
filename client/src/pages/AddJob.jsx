@@ -28,13 +28,13 @@ const AddJob = () => {
 
         // Validation
         if (!title.trim()) {
-            return toast.error('Please enter a job title')
+            return toast.error('Enter a clear role title')
         }
         if (description === '' || description === '<p><br></p>') {
-            return toast.error('Please enter a job description')
+            return toast.error('Add a role description before publishing')
         }
         if (!salary || Number(salary) <= 0) {
-            return toast.error('Please enter a valid salary')
+            return toast.error('Enter a valid monthly salary')
         }
 
         try {
@@ -51,7 +51,7 @@ const AddJob = () => {
             })
 
             if (response.success) {
-                toast.success('Job posted successfully!')
+                toast.success('Role published successfully')
                 setTitle('')
                 setSalary('')
                 quillRef.current.root.innerHTML = ''
@@ -60,7 +60,7 @@ const AddJob = () => {
             }
 
         } catch (error) {
-            toast.error(error.message || 'Failed to post job')
+            toast.error(error.message || 'Could not publish role')
         } finally {
             setIsSubmitting(false)
         }
@@ -70,7 +70,7 @@ const AddJob = () => {
         if (!quillRef.current && editorRef.current) {
             quillRef.current = new Quill(editorRef.current, {
                 theme: 'snow',
-                placeholder: 'Describe the role, responsibilities, and requirements...',
+                placeholder: 'Describe responsibilities, required skills, interview expectations, and working location.',
             })
         }
     }, [])
@@ -86,14 +86,14 @@ const AddJob = () => {
 
     return (
         <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-4 max-w-3xl animate-fade-in'>
-            <h2 className='text-xl font-semibold text-gray-800'>Post a New Job</h2>
+            <h2 className='text-xl font-semibold text-gray-800'>Publish a New Role</h2>
 
             {/* Job Title */}
             <div className='w-full'>
-                <label className='block mb-1 text-sm font-medium text-gray-700'>Job Title <span className='text-red-500'>*</span></label>
+                <label className='block mb-1 text-sm font-medium text-gray-700'>Role title <span className='text-red-500'>*</span></label>
                 <input
                     type='text'
-                    placeholder='e.g. Senior React Developer'
+                    placeholder='Example: Frontend Engineer Intern'
                     onChange={e => setTitle(e.target.value)}
                     value={title}
                     className='w-full max-w-lg px-3 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors'
@@ -102,7 +102,7 @@ const AddJob = () => {
 
             {/* Job Description */}
             <div className='w-full max-w-lg'>
-                <label className='block mb-2 text-sm font-medium text-gray-700'>Job Description <span className='text-red-500'>*</span></label>
+                <label className='block mb-2 text-sm font-medium text-gray-700'>Role description <span className='text-red-500'>*</span></label>
                 <div ref={editorRef} className='min-h-[150px]' />
             </div>
 
@@ -157,7 +157,7 @@ const AddJob = () => {
                     onChange={e => setSalary(e.target.value)}
                     value={salary}
                     type='number'
-                    placeholder='e.g. 50000'
+                    placeholder='Example: 50000'
                 />
             </div>
 
@@ -169,7 +169,7 @@ const AddJob = () => {
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'}`}
             >
-                {isSubmitting ? 'Posting...' : 'Post Job'}
+                {isSubmitting ? 'Publishing...' : 'Publish role'}
             </button>
         </form>
     )

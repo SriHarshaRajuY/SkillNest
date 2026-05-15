@@ -19,7 +19,7 @@ const Footer = () => {
             <Link to='/messages' className='hover:text-blue-600 transition-colors'>Messages</Link>
           </div>
 
-          <p className='text-sm text-gray-400'>Built for secure hiring workflows.</p>
+          <p className='text-sm text-gray-400'>Secure hiring workflows for candidates and teams.</p>
         </div>
       </div>
     </footer>

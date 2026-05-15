@@ -1,9 +1,19 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import { assets } from '../assets/assets'
 import { AppContext } from '../context/AppContext'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { authService } from '../services/authService'
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const validatePassword = (value) => {
+    if (value.length < 8) return 'Password must be at least 8 characters.'
+    if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/\d/.test(value)) {
+        return 'Use uppercase, lowercase, and a number.'
+    }
+    return ''
+}
 
 const RecruiterLogin = () => {
     const navigate = useNavigate()
@@ -16,46 +26,75 @@ const RecruiterLogin = () => {
     const [image, setImage] = useState(null)
     const [isTextDataSubmitted, setIsTextDataSubmitted] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [errors, setErrors] = useState({})
 
-    // Clear all form fields when switching between Login and Sign Up
+    const isSignup = state === 'Sign Up'
+    const passwordHint = useMemo(() => validatePassword(password), [password])
+
     const switchMode = (newState) => {
         setState(newState)
         setName('')
         setEmail('')
         setPassword('')
         setImage(null)
+        setErrors({})
         setIsTextDataSubmitted(false)
     }
 
-    // Prevent background scroll while modal is open
     useEffect(() => {
         document.body.style.overflow = 'hidden'
         return () => { document.body.style.overflow = 'unset' }
     }, [])
 
+    const validateTextStep = () => {
+        const nextErrors = {}
+        if (isSignup && name.trim().length < 2) {
+            nextErrors.name = 'Enter the company or organization name.'
+        }
+        if (!emailPattern.test(email.trim())) {
+            nextErrors.email = 'Enter a valid work email address.'
+        }
+        if (!password.trim()) {
+            nextErrors.password = 'Password is required.'
+        } else if (isSignup) {
+            const passwordError = validatePassword(password)
+            if (passwordError) nextErrors.password = passwordError
+        } else if (password.length < 8) {
+            nextErrors.password = 'Password must be at least 8 characters.'
+        }
+
+        setErrors(nextErrors)
+        return Object.keys(nextErrors).length === 0
+    }
+
     const onSubmitHandler = async (e) => {
         e.preventDefault()
 
-        // Sign Up step 1: collect text data, advance to logo upload step
-        if (state === 'Sign Up' && !isTextDataSubmitted) {
-            return setIsTextDataSubmitted(true)
+        if (!isTextDataSubmitted && !validateTextStep()) return
+
+        if (isSignup && !isTextDataSubmitted) {
+            setIsTextDataSubmitted(true)
+            return
         }
 
-        // Sign Up step 2: require logo
-        if (state === 'Sign Up' && !image) {
-            return toast.error('Please upload your company logo')
+        if (isSignup && !image) {
+            setErrors({ image: 'Upload a company logo to complete registration.' })
+            return
         }
 
         setIsLoading(true)
         try {
-            let response;
-            if (state === 'Login') {
-                response = await authService.loginRecruiter({ email, password })
+            let response
+            if (!isSignup) {
+                response = await authService.loginRecruiter({
+                    email: email.trim(),
+                    password,
+                })
             } else {
                 const formData = new FormData()
-                formData.append('name', name)
+                formData.append('name', name.trim())
                 formData.append('password', password)
-                formData.append('email', email)
+                formData.append('email', email.trim())
                 formData.append('image', image)
                 response = await authService.registerRecruiter(formData)
             }
@@ -65,128 +104,173 @@ const RecruiterLogin = () => {
                 setCompanyToken(response.data.token)
                 localStorage.setItem('companyToken', response.data.token)
                 setShowRecruiterLogin(false)
-                toast.success(response.message || 'Successfully logged in')
+                toast.success(isSignup ? 'Recruiter workspace created' : 'Welcome back')
                 navigate('/dashboard')
             }
         } catch (error) {
-            toast.error(error.message || 'Something went wrong')
+            toast.error(error.errors?.[0] || error.message || 'Authentication failed. Please review your details.')
         } finally {
             setIsLoading(false)
         }
     }
 
     return (
-        <div className='fixed inset-0 z-50 backdrop-blur-sm bg-black/40 flex justify-center items-center px-4'>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm'>
             <form
                 onSubmit={onSubmitHandler}
-                className='relative bg-white w-full max-w-md p-8 rounded-2xl shadow-2xl text-slate-600 animate-fade-in'
+                className='relative grid w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid-cols-[0.9fr_1.1fr]'
             >
-                {/* Close button */}
                 <button
                     type='button'
                     onClick={() => setShowRecruiterLogin(false)}
-                    className='absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none'
-                    aria-label='Close'
+                    className='absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                    aria-label='Close recruiter authentication'
                 >
-                    ×
+                    x
                 </button>
 
-                <h1 className='text-center text-3xl text-neutral-800 font-bold mb-1'>
-                    Recruiter {state}
-                </h1>
-                <p className='text-center text-sm text-gray-400 mb-8 font-medium'>
-                    {state === 'Login' ? 'Access your recruitment dashboard.' : 'Partner with SkillNest to find top talent.'}
-                </p>
+                <aside className='hidden bg-slate-950 p-8 text-white md:flex md:flex-col md:justify-between'>
+                    <div>
+                        <div className='mb-8 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-white/80'>
+                            Recruiter Workspace
+                        </div>
+                        <h2 className='text-3xl font-black leading-tight'>
+                            Manage hiring with secure, role-aware workflows.
+                        </h2>
+                        <p className='mt-4 text-sm leading-6 text-white/65'>
+                            Review applicants, track pipeline movement, collaborate with your team, and keep sensitive resume access accountable.
+                        </p>
+                    </div>
+                    <div className='grid gap-3 text-sm text-white/75'>
+                        <span>Secure resume links</span>
+                        <span>Role-based recruiter access</span>
+                        <span>Audit-ready hiring actions</span>
+                    </div>
+                </aside>
 
-                {/* Sign Up — Step 2: Company logo upload */}
-                {state === 'Sign Up' && isTextDataSubmitted ? (
-                    <div className='flex flex-col items-center gap-4 my-6'>
-                        <label htmlFor='image' className='cursor-pointer group'>
-                            <div className="relative">
+                <section className='p-6 sm:p-8'>
+                    <div className='mb-7 pr-10'>
+                        <p className='text-xs font-black uppercase tracking-widest text-indigo-600'>
+                            {isSignup ? 'Create workspace' : 'Recruiter sign in'}
+                        </p>
+                        <h1 className='mt-2 text-2xl font-black text-slate-900'>
+                            {isSignup ? 'Set up your company account' : 'Access your recruiter dashboard'}
+                        </h1>
+                        <p className='mt-2 text-sm leading-6 text-slate-500'>
+                            {isSignup
+                                ? 'Use a work email and a strong password. You can add more recruiters after setup.'
+                                : 'Sign in with your recruiter credentials to continue reviewing candidates.'}
+                        </p>
+                    </div>
+
+                    {isSignup && (
+                        <div className='mb-6 grid grid-cols-2 gap-2 text-xs font-bold'>
+                            <div className={`rounded-lg px-3 py-2 ${!isTextDataSubmitted ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                1. Account details
+                            </div>
+                            <div className={`rounded-lg px-3 py-2 ${isTextDataSubmitted ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                2. Company logo
+                            </div>
+                        </div>
+                    )}
+
+                    {isSignup && isTextDataSubmitted ? (
+                        <div className='rounded-2xl border border-slate-200 bg-slate-50 p-5'>
+                            <label htmlFor='image' className='flex cursor-pointer flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center hover:border-indigo-300'>
                                 <img
-                                    className='w-28 h-28 rounded-full object-cover border-2 border-dashed border-gray-300 group-hover:border-indigo-400 transition-all'
+                                    className='h-24 w-24 rounded-2xl object-cover border border-slate-100'
                                     src={image ? URL.createObjectURL(image) : assets.upload_area}
-                                    alt='Company logo'
+                                    alt='Company logo preview'
                                 />
-                                {!image && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <span className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded-full font-bold">Upload</span>
-                                </div>}
-                            </div>
-                        </label>
-                        <input onChange={e => setImage(e.target.files[0])} type='file' id='image' accept='image/*' hidden />
-                        <p className='text-xs font-bold text-gray-400 uppercase tracking-widest'>Company Brand Mark</p>
-                    </div>
-                ) : (
-                    <div className='space-y-4'>
-                        {/* Company name — Sign Up only */}
-                        {state !== 'Login' && (
-                            <div className='bg-slate-50 border border-gray-200 px-5 py-3 flex items-center gap-3 rounded-2xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all'>
-                                <img src={assets.person_icon} alt='' className='w-4 h-4 opacity-40' />
+                                <div>
+                                    <p className='text-sm font-black text-slate-900'>Upload company logo</p>
+                                    <p className='mt-1 text-xs text-slate-500'>PNG, JPG, or WEBP. This appears on job cards and recruiter pages.</p>
+                                </div>
+                            </label>
+                            <input onChange={e => setImage(e.target.files?.[0] || null)} type='file' id='image' accept='image/png,image/jpeg,image/webp' hidden />
+                            {errors.image && <p className='mt-2 text-xs font-semibold text-rose-600'>{errors.image}</p>}
+                            <button
+                                type='button'
+                                onClick={() => setIsTextDataSubmitted(false)}
+                                className='mt-4 text-sm font-bold text-slate-500 hover:text-slate-800'
+                            >
+                                Back to account details
+                            </button>
+                        </div>
+                    ) : (
+                        <div className='space-y-4'>
+                            {isSignup && (
+                                <label className='block'>
+                                    <span className='text-sm font-bold text-slate-700'>Company name</span>
+                                    <input
+                                        className='mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                                        onChange={e => setName(e.target.value)}
+                                        value={name}
+                                        type='text'
+                                        placeholder='Example: Acme Technologies'
+                                        autoComplete='organization'
+                                    />
+                                    {errors.name && <p className='mt-1 text-xs font-semibold text-rose-600'>{errors.name}</p>}
+                                </label>
+                            )}
+
+                            <label className='block'>
+                                <span className='text-sm font-bold text-slate-700'>Work email</span>
                                 <input
-                                    className='bg-transparent outline-none text-sm w-full font-medium'
-                                    onChange={e => setName(e.target.value)}
-                                    value={name}
-                                    type='text'
-                                    placeholder='Company Name'
-                                    required
+                                    className='mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                                    onChange={e => setEmail(e.target.value)}
+                                    value={email}
+                                    type='email'
+                                    placeholder='recruiting@company.com'
+                                    autoComplete='email'
                                 />
-                            </div>
-                        )}
+                                {errors.email && <p className='mt-1 text-xs font-semibold text-rose-600'>{errors.email}</p>}
+                            </label>
 
-                        <div className='bg-slate-50 border border-gray-200 px-5 py-3 flex items-center gap-3 rounded-2xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all'>
-                            <img src={assets.email_icon} alt='' className='w-4 h-4 opacity-40' />
-                            <input
-                                className='bg-transparent outline-none text-sm w-full font-medium'
-                                onChange={e => setEmail(e.target.value)}
-                                value={email}
-                                type='email'
-                                placeholder='Corporate Email'
-                                required
-                            />
+                            <label className='block'>
+                                <span className='text-sm font-bold text-slate-700'>Password</span>
+                                <input
+                                    className='mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                                    onChange={e => setPassword(e.target.value)}
+                                    value={password}
+                                    type='password'
+                                    placeholder={isSignup ? 'At least 8 characters' : 'Enter your password'}
+                                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                                />
+                                {errors.password
+                                    ? <p className='mt-1 text-xs font-semibold text-rose-600'>{errors.password}</p>
+                                    : isSignup && password && <p className={`mt-1 text-xs font-semibold ${passwordHint ? 'text-slate-500' : 'text-emerald-600'}`}>
+                                        {passwordHint || 'Password strength looks good.'}
+                                    </p>}
+                            </label>
                         </div>
+                    )}
 
-                        <div className='bg-slate-50 border border-gray-200 px-5 py-3 flex items-center gap-3 rounded-2xl focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all'>
-                            <img src={assets.lock_icon} alt='' className='w-4 h-4 opacity-40' />
-                            <input
-                                className='bg-transparent outline-none text-sm w-full font-medium'
-                                onChange={e => setPassword(e.target.value)}
-                                value={password}
-                                type='password'
-                                placeholder='Security Key'
-                                required
-                            />
-                        </div>
-                    </div>
-                )}
+                    <button
+                        type='submit'
+                        disabled={isLoading}
+                        className='mt-7 w-full rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60'
+                    >
+                        {isLoading
+                            ? 'Please wait...'
+                            : !isSignup
+                                ? 'Sign in to dashboard'
+                                : isTextDataSubmitted
+                                    ? 'Create recruiter workspace'
+                                    : 'Continue to logo upload'}
+                    </button>
 
-                <button
-                    type='submit'
-                    disabled={isLoading}
-                    className={`w-full py-3.5 rounded-2xl mt-8 font-bold text-sm tracking-wide transition-all text-white shadow-lg shadow-blue-200 ${isLoading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02] active:scale-95'}`}
-                >
-                    {isLoading ? 'Processing...' : state === 'Login' ? 'Login to Dashboard' : isTextDataSubmitted ? 'Create Account' : 'Next Step'}
-                </button>
-
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                    {state === 'Login'
-                        ? (
-                            <p className='text-center text-sm text-gray-500'>
-                                New to SkillNest?{' '}
-                                <span className='text-indigo-600 cursor-pointer font-bold hover:underline ml-1' onClick={() => switchMode('Sign Up')}>
-                                    Start hiring today
-                                </span>
-                            </p>
-                        )
-                        : (
-                            <p className='text-center text-sm text-gray-500'>
-                                Already have an account?{' '}
-                                <span className='text-indigo-600 cursor-pointer font-bold hover:underline ml-1' onClick={() => switchMode('Login')}>
-                                    Login here
-                                </span>
-                            </p>
-                        )
-                    }
-                </div>
+                    <p className='mt-6 text-center text-sm text-slate-500'>
+                        {isSignup ? 'Already manage a SkillNest workspace?' : 'New company on SkillNest?'}
+                        <button
+                            type='button'
+                            className='ml-2 font-black text-indigo-600 hover:text-indigo-700'
+                            onClick={() => switchMode(isSignup ? 'Login' : 'Sign Up')}
+                        >
+                            {isSignup ? 'Sign in' : 'Create recruiter account'}
+                        </button>
+                    </p>
+                </section>
             </form>
         </div>
     )

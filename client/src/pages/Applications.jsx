@@ -142,7 +142,7 @@ const Applications = () => {
                 toast.success('Career preferences saved')
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to save preferences')
+            toast.error(error.message || 'Could not save career preferences')
         } finally {
             setSavingPreferences(false)
         }
@@ -164,7 +164,7 @@ const Applications = () => {
                 ))
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to withdraw application')
+            toast.error(error.message || 'Could not withdraw application')
         }
     }
 
@@ -176,8 +176,8 @@ const Applications = () => {
                 <Navbar />
                 <div className='container px-4 min-h-[65vh] 2xl:px-20 mx-auto my-10 flex flex-col items-center justify-center text-center'>
                     <div className='text-6xl mb-4'>🔐</div>
-                    <h2 className='text-2xl font-semibold text-gray-700 mb-2'>Login Required</h2>
-                    <p className='text-gray-500 max-w-md'>Please sign in to view your applied jobs and manage your resume.</p>
+                    <h2 className='text-2xl font-semibold text-gray-700 mb-2'>Sign in to manage applications</h2>
+                    <p className='text-gray-500 max-w-md'>Use your candidate account to view applications, update your resume, and message recruiters.</p>
                 </div>
                 <Footer />
             </>
@@ -208,7 +208,7 @@ const Applications = () => {
                         onClick={fetchUserData}
                         className='bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full transition-colors'
                     >
-                        Retry
+                        Try again
                     </button>
                 </div>
                 <Footer />
@@ -229,7 +229,7 @@ const Applications = () => {
                         ? <>
                             <label className='flex items-center cursor-pointer' htmlFor='resumeUpload'>
                                 <p className='bg-blue-100 text-blue-600 px-4 py-2 rounded-lg mr-2'>
-                                    {resume ? resume.name : 'Select Resume (PDF)'}
+                                    {resume ? resume.name : 'Select resume PDF'}
                                 </p>
                                 <input
                                     id='resumeUpload'
@@ -247,7 +247,7 @@ const Applications = () => {
                                     ? 'bg-green-100 border-green-400 text-green-700 hover:bg-green-200'
                                     : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
                             >
-                                Save
+                                Save resume
                             </button>
                             {isEdit && (
                                 <button
@@ -273,13 +273,13 @@ const Applications = () => {
                                 }}
                                 className='bg-blue-100 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors cursor-pointer'
                             >
-                                View Resume
+                                View resume
                             </button>
                             <button
                                 onClick={() => setIsEdit(true)}
                                 className='text-gray-500 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50'
                             >
-                                Update
+                                Replace resume
                             </button>
                         </div>
                     }
@@ -296,7 +296,7 @@ const Applications = () => {
                                 <input
                                     value={skillsInput}
                                     onChange={(e) => setSkillsInput(e.target.value)}
-                                    placeholder='React, Node.js, MongoDB, Java'
+                                    placeholder='Example: React, Node.js, MongoDB, Java'
                                     className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
                                 />
                             </label>
@@ -307,7 +307,7 @@ const Applications = () => {
                                     onChange={(e) => setExperienceLevel(e.target.value)}
                                     className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
                                 >
-                                    <option value=''>No preference</option>
+                                    <option value=''>Open to all levels</option>
                                     <option value='Beginner level'>Beginner</option>
                                     <option value='Intermediate level'>Intermediate</option>
                                     <option value='Senior level'>Senior</option>
@@ -354,7 +354,7 @@ const Applications = () => {
                             disabled={savingPreferences}
                             className='rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60'
                         >
-                            {savingPreferences ? 'Saving...' : 'Save preferences'}
+                            {savingPreferences ? 'Saving...' : 'Save career preferences'}
                         </button>
                     </div>
                 </div>
@@ -368,7 +368,7 @@ const Applications = () => {
                     ? <div className='text-center py-20 border rounded-lg bg-gray-50'>
                         <div className='text-5xl mb-4'>No applications</div>
                         <p className='text-xl text-gray-600 font-medium'>No applications yet</p>
-                        <p className='text-sm text-gray-400 mt-2'>Browse jobs and apply to get started!</p>
+                        <p className='text-sm text-gray-400 mt-2'>Explore open roles and apply when you find a good fit.</p>
                     </div>
                     : <table className='min-w-full bg-white border rounded-lg overflow-hidden'>
                         <thead className='bg-gray-50'>

@@ -6,7 +6,7 @@ export const authService = {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
-    // Recruiter Login
+    // Recruiter authentication
     loginRecruiter: (credentials) => apiClient.post('/api/company/login', credentials),
 
     // Recruiter Profile

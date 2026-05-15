@@ -197,8 +197,8 @@ const JobListing = () => {
             <section className='w-full lg:w-3/4 text-gray-800 max-lg:px-4'>
                 <div className="flex justify-between items-end mb-8">
                     <div>
-                        <h3 className='font-bold text-3xl text-slate-900 tracking-tight' id='job-list'>Latest Jobs</h3>
-                        <p className='text-gray-500 mt-1 font-medium'>Find your next career move</p>
+                        <h3 className='font-bold text-3xl text-slate-900 tracking-tight' id='job-list'>Open Roles</h3>
+                        <p className='text-gray-500 mt-1 font-medium'>Explore roles that match your goals and skills.</p>
                     </div>
                     {jobsCount > 0 && !loading && (
                         <p className="text-sm text-slate-500 font-medium">Page <span className='text-indigo-600 font-bold'>{currentPage}</span> of {totalPages}</p>
@@ -208,7 +208,7 @@ const JobListing = () => {
                 {error && (
                     <div className="bg-red-50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl mb-8 flex justify-between items-center animate-shake">
                         <span className='font-medium'>{error}</span>
-                        <button onClick={fetchJobs} className="text-sm font-bold underline hover:no-underline px-4 py-1.5 bg-white rounded-lg shadow-sm">Retry</button>
+                        <button onClick={fetchJobs} className="text-sm font-bold underline hover:no-underline px-4 py-1.5 bg-white rounded-lg shadow-sm">Try again</button>
                     </div>
                 )}
 
@@ -217,7 +217,7 @@ const JobListing = () => {
                         <div className='flex items-center justify-between gap-4 mb-4'>
                             <div>
                                 <h4 className='font-black text-slate-900 text-xl'>Recommended for you</h4>
-                                <p className='text-sm text-emerald-700 font-medium'>Based on saved jobs and past applications</p>
+                                <p className='text-sm text-emerald-700 font-medium'>Based on your skills, preferences, saved roles, and applications.</p>
                             </div>
                             <span className='hidden sm:inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-100'>
                                 Lightweight matching
@@ -250,8 +250,7 @@ const JobListing = () => {
                         ))
                     ) : !error && (
                         <div className='col-span-full text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200'>
-                            <div className='text-4xl mb-4'>No results</div>
-                            <p className='text-slate-400 text-lg mb-2 font-bold'>No jobs found matching your criteria</p>
+                            <p className='text-slate-400 text-lg mb-2 font-bold'>No roles match the current filters</p>
                             <button 
                                 onClick={() => {
                                     setSelectedCategories([])

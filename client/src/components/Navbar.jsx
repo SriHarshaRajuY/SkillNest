@@ -68,7 +68,7 @@ const Navbar = () => {
                                 Applied Jobs
                             </Link>
                             <Link to='/saved-jobs' className='text-gray-600 hover:text-blue-600 transition-colors font-medium'>
-                                Saved Jobs
+                                Saved Roles
                             </Link>
                             <Link to='/messages' className='text-gray-600 hover:text-blue-600 transition-colors font-medium inline-flex items-center gap-1.5'>
                                 Messages
@@ -89,13 +89,13 @@ const Navbar = () => {
                                 onClick={() => setShowRecruiterLogin(true)}
                                 className='text-gray-600 hover:text-blue-600 transition-colors font-medium'
                             >
-                                Recruiter Login
+                                Recruiter Portal
                             </button>
                             <button
                                 onClick={() => openSignIn()}
                                 className='bg-blue-600 hover:bg-blue-700 transition-colors text-white px-5 py-2 rounded-full font-medium'
                             >
-                                Login
+                                Candidate Sign In
                             </button>
                         </div>
                     )
@@ -131,7 +131,7 @@ const Navbar = () => {
                                     onClick={() => setMobileOpen(false)}
                                     className='text-gray-700 font-medium hover:text-blue-600'
                                 >
-                                    Saved Jobs
+                                    Saved Roles
                                 </Link>
                                 <Link
                                     to='/messages'
@@ -157,13 +157,13 @@ const Navbar = () => {
                                     onClick={() => { setShowRecruiterLogin(true); setMobileOpen(false) }}
                                     className='text-left text-gray-700 font-medium hover:text-blue-600'
                                 >
-                                    Recruiter Login
+                                    Recruiter Portal
                                 </button>
                                 <button
                                     onClick={() => { openSignIn(); setMobileOpen(false) }}
                                     className='bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full font-medium text-sm w-fit'
                                 >
-                                    Login
+                                    Candidate Sign In
                                 </button>
                             </>
                         )
