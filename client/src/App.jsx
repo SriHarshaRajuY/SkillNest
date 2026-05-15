@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
 import ApplyJob from './pages/ApplyJob'
 import Applications from './pages/Applications'
+import SavedJobs from './pages/SavedJobs'
 import RecruiterLogin from './components/RecruiterLogin'
 import { AppContext } from './context/AppContext'
 import Dashboard from './pages/Dashboard'
@@ -13,6 +14,8 @@ import NotFound from './pages/NotFound'
 import CandidateMessages from './pages/CandidateMessages'
 import RecruiterMessages from './pages/RecruiterMessages'
 import Analytics from './pages/Analytics'
+import RecruiterTeam from './pages/RecruiterTeam'
+import AuditLogs from './pages/AuditLogs'
 import ProtectedRecruiterRoute from './components/ProtectedRecruiterRoute'
 import 'quill/dist/quill.snow.css'
 import { ToastContainer } from 'react-toastify'
@@ -37,6 +40,7 @@ const App = () => {
                     <Route path='/' element={<Home />} />
                     <Route path='/apply-job/:id' element={<ApplyJob />} />
                     <Route path='/applications' element={<Applications />} />
+                    <Route path='/saved-jobs' element={<SavedJobs />} />
                     <Route path='/messages' element={<CandidateMessages />} />
                     <Route path='/messages/:applicationId' element={<CandidateMessages />} />
                     <Route
@@ -53,6 +57,8 @@ const App = () => {
                         <Route path='messages' element={<RecruiterMessages />} />
                         <Route path='messages/:applicationId' element={<RecruiterMessages />} />
                         <Route path='analytics' element={<Analytics />} />
+                        <Route path='team' element={<RecruiterTeam />} />
+                        <Route path='audit-logs' element={<AuditLogs />} />
                     </Route>
                     <Route path='*' element={<NotFound />} />
                 </Routes>

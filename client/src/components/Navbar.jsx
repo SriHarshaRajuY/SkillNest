@@ -67,6 +67,9 @@ const Navbar = () => {
                             <Link to='/applications' className='text-gray-600 hover:text-blue-600 transition-colors font-medium'>
                                 Applied Jobs
                             </Link>
+                            <Link to='/saved-jobs' className='text-gray-600 hover:text-blue-600 transition-colors font-medium'>
+                                Saved Jobs
+                            </Link>
                             <Link to='/messages' className='text-gray-600 hover:text-blue-600 transition-colors font-medium inline-flex items-center gap-1.5'>
                                 Messages
                                 {msgUnread > 0 && (
@@ -122,6 +125,13 @@ const Navbar = () => {
                                     className='text-gray-700 font-medium hover:text-blue-600'
                                 >
                                     Applied Jobs
+                                </Link>
+                                <Link
+                                    to='/saved-jobs'
+                                    onClick={() => setMobileOpen(false)}
+                                    className='text-gray-700 font-medium hover:text-blue-600'
+                                >
+                                    Saved Jobs
                                 </Link>
                                 <Link
                                     to='/messages'

@@ -25,6 +25,7 @@ export const AppContextProvider = ({ children }) => {
     const [companyLoaded, setCompanyLoaded] = useState(false)
     const [userData, setUserData] = useState(null)
     const [userApplications, setUserApplications] = useState([])
+    const [savedJobIds, setSavedJobIds] = useState([])
     const [userDataLoaded, setUserDataLoaded] = useState(false)
     const [apiOffline, setApiOffline] = useState(false)
 
@@ -96,6 +97,19 @@ export const AppContextProvider = ({ children }) => {
         }
     }
 
+    const fetchSavedJobs = async () => {
+        try {
+            const token = await getToken()
+            const response = await applicationService.getSavedJobs(token)
+            if (response.success) {
+                setSavedJobIds(response.data.savedJobIds || [])
+                setApiOffline(false)
+            }
+        } catch (error) {
+            setApiOffline(Boolean(error.isNetworkError))
+        }
+    }
+
     // ─── Lifecycle ──────────────────────────────────────────────────────────
     useEffect(() => {
         fetchJobs()
@@ -117,10 +131,11 @@ export const AppContextProvider = ({ children }) => {
     useEffect(() => {
         if (user) {
             setUserDataLoaded(false)
-            void Promise.all([fetchUserData(), fetchUserApplications()])
+            void Promise.all([fetchUserData(), fetchUserApplications(), fetchSavedJobs()])
         } else {
             setUserData(null)
             setUserApplications([])
+            setSavedJobIds([])
             setUserDataLoaded(true)
         }
     }, [user])
@@ -136,6 +151,7 @@ export const AppContextProvider = ({ children }) => {
         companyLoaded,
         userData, setUserData,
         userApplications, setUserApplications,
+        savedJobIds, setSavedJobIds, fetchSavedJobs,
         userDataLoaded,
         fetchUserData,
         fetchUserApplications,

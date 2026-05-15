@@ -3,6 +3,7 @@ import apiClient from './apiClient';
 export const recruiterService = {
     // Job Management
     postJob: (jobData) => apiClient.post('/api/company/post-job', jobData),
+    updateJob: (id, jobData) => apiClient.put(`/api/company/jobs/${id}`, jobData),
     getPostedJobs: (params) => apiClient.get('/api/company/list-jobs', { params }),
     toggleJobVisibility: (id) => apiClient.post('/api/company/change-visibility', { id }),
 
@@ -18,4 +19,10 @@ export const recruiterService = {
 
     // Analytics
     getAnalytics: () => apiClient.get('/api/company/analytics'),
+
+    // Team and audit
+    getTeam: () => apiClient.get('/api/company/team'),
+    createTeamMember: (data) => apiClient.post('/api/company/team', data),
+    updateTeamMember: (memberId, data) => apiClient.patch(`/api/company/team/${memberId}`, data),
+    getAuditLogs: (params) => apiClient.get('/api/company/audit-logs', { params }),
 };

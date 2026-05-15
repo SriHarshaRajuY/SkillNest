@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import { assets } from '../assets/assets'
+import { assets, JobCategories, JobLocations } from '../assets/assets'
 import moment from 'moment'
 import Footer from '../components/Footer'
 import { AppContext } from '../context/AppContext'
@@ -30,10 +30,16 @@ const Applications = () => {
     const [isEdit, setIsEdit] = useState(false)
     const [resume, setResume] = useState(null)
     const [realtimeToken, setRealtimeToken] = useState(null)
+    const [skillsInput, setSkillsInput] = useState('')
+    const [preferredLocations, setPreferredLocations] = useState([])
+    const [preferredCategories, setPreferredCategories] = useState([])
+    const [experienceLevel, setExperienceLevel] = useState('')
+    const [savingPreferences, setSavingPreferences] = useState(false)
 
     const {
         backendUrl,
         userData,
+        setUserData,
         userApplications,
         userDataLoaded,
         fetchUserData,
@@ -77,6 +83,14 @@ const Applications = () => {
         },
     })
 
+    useEffect(() => {
+        if (!userData) return
+        setSkillsInput((userData.skills || []).join(', '))
+        setPreferredLocations(userData.preferredLocations || [])
+        setPreferredCategories(userData.preferredCategories || [])
+        setExperienceLevel(userData.experienceLevel || '')
+    }, [userData])
+
     const updateResume = async () => {
         if (!resume) {
             return toast.error('Please select a PDF file first.')
@@ -101,6 +115,57 @@ const Applications = () => {
 
         setIsEdit(false)
         setResume(null)
+    }
+
+    const togglePreference = (value, list, setter) => {
+        setter(list.includes(value) ? list.filter((item) => item !== value) : [...list, value])
+    }
+
+    const savePreferences = async () => {
+        try {
+            setSavingPreferences(true)
+            const token = await getToken()
+            const skills = skillsInput
+                .split(',')
+                .map((skill) => skill.trim())
+                .filter(Boolean)
+
+            const response = await applicationService.updatePreferences({
+                skills,
+                preferredLocations,
+                preferredCategories,
+                experienceLevel,
+            }, token)
+
+            if (response.success) {
+                setUserData(response.data.user)
+                toast.success('Career preferences saved')
+            }
+        } catch (error) {
+            toast.error(error.message || 'Failed to save preferences')
+        } finally {
+            setSavingPreferences(false)
+        }
+    }
+
+    const withdrawApplication = async (applicationId) => {
+        const confirmed = window.confirm('Withdraw this application? Recruiters will see it as withdrawn.')
+        if (!confirmed) return
+
+        try {
+            const token = await getToken()
+            const response = await applicationService.withdrawApplication(applicationId, token)
+            if (response.success) {
+                toast.success(response.message)
+                setUserApplications((prev) => prev.map((application) =>
+                    String(application._id) === String(applicationId)
+                        ? { ...application, ...response.data.application }
+                        : application
+                ))
+            }
+        } catch (error) {
+            toast.error(error.message || 'Failed to withdraw application')
+        }
     }
 
 
@@ -220,6 +285,80 @@ const Applications = () => {
                     }
                 </div>
 
+                {/* Career Preferences */}
+                <div className='mb-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm'>
+                    <div className='flex flex-col lg:flex-row lg:items-start justify-between gap-6'>
+                        <div className='flex-1'>
+                            <h2 className='text-xl font-semibold text-slate-900'>Career Preferences</h2>
+                            <p className='text-sm text-slate-500 mt-1'>Used to improve your saved-job recommendations.</p>
+                            <label className='block mt-4'>
+                                <span className='text-sm font-bold text-slate-700'>Skills</span>
+                                <input
+                                    value={skillsInput}
+                                    onChange={(e) => setSkillsInput(e.target.value)}
+                                    placeholder='React, Node.js, MongoDB, Java'
+                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                                />
+                            </label>
+                            <label className='block mt-4 max-w-xs'>
+                                <span className='text-sm font-bold text-slate-700'>Experience Level</span>
+                                <select
+                                    value={experienceLevel}
+                                    onChange={(e) => setExperienceLevel(e.target.value)}
+                                    className='mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                                >
+                                    <option value=''>No preference</option>
+                                    <option value='Beginner level'>Beginner</option>
+                                    <option value='Intermediate level'>Intermediate</option>
+                                    <option value='Senior level'>Senior</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div className='flex-1 grid sm:grid-cols-2 gap-5'>
+                            <div>
+                                <p className='text-sm font-bold text-slate-700 mb-2'>Preferred Categories</p>
+                                <div className='flex flex-wrap gap-2'>
+                                    {JobCategories.map((category) => (
+                                        <button
+                                            key={category}
+                                            type='button'
+                                            onClick={() => togglePreference(category, preferredCategories, setPreferredCategories)}
+                                            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${preferredCategories.includes(category) ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            {category}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <p className='text-sm font-bold text-slate-700 mb-2'>Preferred Locations</p>
+                                <div className='flex flex-wrap gap-2'>
+                                    {JobLocations.map((location) => (
+                                        <button
+                                            key={location}
+                                            type='button'
+                                            onClick={() => togglePreference(location, preferredLocations, setPreferredLocations)}
+                                            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${preferredLocations.includes(location) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            {location}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className='mt-5 flex justify-end'>
+                        <button
+                            type='button'
+                            onClick={savePreferences}
+                            disabled={savingPreferences}
+                            className='rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60'
+                        >
+                            {savingPreferences ? 'Saving...' : 'Save preferences'}
+                        </button>
+                    </div>
+                </div>
+
                 {/* Applications + live pipeline */}
                 <h2 className='text-xl font-semibold mb-1'>Jobs Applied</h2>
                 <p className='text-sm text-gray-500 mb-4'>
@@ -239,18 +378,22 @@ const Applications = () => {
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700 max-sm:hidden'>Location</th>
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700 max-sm:hidden'>Applied On</th>
                                 <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Stage</th>
-                                <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Inbox</th>
+                                <th className='py-3 px-4 border-b text-left font-medium text-gray-700'>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {userApplications.map((job) => {
                                 const stage = displayPipelineStage(job)
                                 const stageCls =
-                                    stage === 'Rejected'
+                                    stage === 'Withdrawn'
+                                        ? 'bg-slate-100 text-slate-700'
+                                        : stage === 'Rejected'
                                         ? 'bg-red-100 text-red-700'
                                         : stage === 'Hired' || stage === 'Offer'
                                             ? 'bg-emerald-100 text-emerald-800'
                                             : 'bg-sky-100 text-sky-800'
+                                const canMessage = ['Screening', 'Interview', 'Offer', 'Hired'].includes(stage)
+                                const canWithdraw = !['Withdrawn', 'Rejected', 'Hired'].includes(stage)
                                 return (
                                     <Fragment key={job._id}>
                                         <tr className='hover:bg-gray-50 transition-colors'>
@@ -274,12 +417,27 @@ const Applications = () => {
                                                 </span>
                                             </td>
                                             <td className='py-2 px-4 border-b align-middle'>
-                                                <Link
-                                                    to={`/messages/${job._id}`}
-                                                    className='inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100'
-                                                >
-                                                    Message
-                                                </Link>
+                                                <div className='flex flex-wrap items-center gap-2'>
+                                                    {canMessage ? (
+                                                        <Link
+                                                            to={`/messages/${job._id}`}
+                                                            className='inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100'
+                                                        >
+                                                            Message
+                                                        </Link>
+                                                    ) : (
+                                                        <span className='text-xs font-semibold text-slate-400'>Locked</span>
+                                                    )}
+                                                    {canWithdraw && (
+                                                        <button
+                                                            type='button'
+                                                            onClick={() => withdrawApplication(job._id)}
+                                                            className='inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-100'
+                                                        >
+                                                            Withdraw
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                         <tr className='bg-slate-50/90'>

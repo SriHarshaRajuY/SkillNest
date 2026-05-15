@@ -1,10 +1,14 @@
 import Company from '../models/Company.js'
+import RecruiterUser from '../models/RecruiterUser.js'
+import AuditLog from '../models/AuditLog.js'
 import bcrypt from 'bcrypt'
 import { v2 as cloudinary } from 'cloudinary'
 import mongoose from 'mongoose'
+import sanitizeHtml from 'sanitize-html'
 import generateToken from '../utils/generateToken.js'
 import Job from '../models/Job.js'
 import JobApplication from '../models/JobApplication.js'
+import User from '../models/User.js'
 import { PIPELINE_STAGES } from '../constants/pipeline.js'
 import { emitToApplication } from '../realtime/socketHub.js'
 import { removeLocalFile } from '../utils/fileHelpers.js'
@@ -12,13 +16,40 @@ import { fetchResumeBuffer } from './userController.js'
 import aiService from '../services/aiService.js'
 import asyncHandler from '../middleware/asyncHandler.js'
 import { cacheGet, cacheSet } from '../utils/redisClient.js'
-import logger from '../utils/logger.js'
+import { logAuditEvent } from '../services/auditService.js'
 
-const sanitizeJobDescription = (html) => html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
+const sanitizeJobDescription = (html) => sanitizeHtml(html, {
+    allowedTags: [
+        'p', 'br', 'strong', 'b', 'em', 'i', 'u',
+        'ul', 'ol', 'li', 'h2', 'h3', 'blockquote',
+        'a', 'code', 'pre',
+    ],
+    allowedAttributes: {
+        a: ['href', 'target', 'rel'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+        a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),
+    },
+})
+
+const buildJobPayload = ({ title, description, location, salary, level, category }) => {
+    const trimmedDescription = sanitizeJobDescription(description.trim())
+    if (!trimmedDescription || trimmedDescription === '<p><br></p>') {
+        const error = new Error('Please enter a job description')
+        error.statusCode = 400
+        throw error
+    }
+
+    return {
+        title: title.trim(),
+        description: trimmedDescription,
+        location: location.trim(),
+        salary: Number(salary),
+        level,
+        category,
+    }
+}
 
 // @desc    Register a new company
 // @route   POST /api/company/register
@@ -33,8 +64,12 @@ export const registerCompany = asyncHandler(async (req, res) => {
     }
 
     try {
-        const exists = await Company.findOne({ email: email.toLowerCase().trim() })
-        if (exists) {
+        const normalizedEmail = email.toLowerCase().trim()
+        const exists = await Promise.all([
+            Company.findOne({ email: normalizedEmail }),
+            RecruiterUser.findOne({ email: normalizedEmail }),
+        ])
+        if (exists.some(Boolean)) {
             res.status(409)
             throw new Error('An account with this email already exists')
         }
@@ -46,17 +81,36 @@ export const registerCompany = asyncHandler(async (req, res) => {
 
         const company = await Company.create({
             name: name.trim(),
-            email: email.toLowerCase().trim(),
+            email: normalizedEmail,
             password: hashPassword,
             image: imageUpload.secure_url,
+        })
+
+        const recruiter = await RecruiterUser.create({
+            companyId: company._id,
+            name: `${name.trim()} Admin`,
+            email: normalizedEmail,
+            password: hashPassword,
+            role: 'Admin',
         })
 
         res.status(201).json({
             success: true,
             message: 'Company registered successfully',
             data: {
-                company: { _id: company._id, name: company.name, email: company.email, image: company.image },
-                token: generateToken(company._id),
+                company: {
+                    _id: company._id,
+                    name: company.name,
+                    email: company.email,
+                    image: company.image,
+                    currentRecruiter: {
+                        _id: recruiter._id,
+                        name: recruiter.name,
+                        email: recruiter.email,
+                        role: recruiter.role,
+                    },
+                },
+                token: generateToken({ companyId: company._id, recruiterId: recruiter._id, role: recruiter.role }),
             }
         })
     } finally {
@@ -69,25 +123,63 @@ export const registerCompany = asyncHandler(async (req, res) => {
 // @access  Public
 export const loginCompany = asyncHandler(async (req, res) => {
     const { email, password } = req.body
+    const normalizedEmail = email.toLowerCase().trim()
 
-    const company = await Company.findOne({ email: email.toLowerCase().trim() })
+    let recruiter = await RecruiterUser.findOne({ email: normalizedEmail })
+    let company = null
+
+    if (recruiter) {
+        if (recruiter.status !== 'Active') {
+            res.status(403)
+            throw new Error('This recruiter account is suspended')
+        }
+        company = await Company.findById(recruiter.companyId)
+    } else {
+        company = await Company.findOne({ email: normalizedEmail })
+    }
+
     if (!company) {
         res.status(401)
         throw new Error('Invalid email or password')
     }
 
-    const isMatch = await bcrypt.compare(password, company.password)
+    const passwordHash = recruiter?.password || company.password
+    const isMatch = await bcrypt.compare(password, passwordHash)
     if (!isMatch) {
         res.status(401)
         throw new Error('Invalid email or password')
     }
 
+    if (!recruiter) {
+        recruiter = await RecruiterUser.create({
+            companyId: company._id,
+            name: `${company.name} Admin`,
+            email: company.email,
+            password: company.password,
+            role: 'Admin',
+        })
+    }
+
+    recruiter.lastLoginAt = new Date()
+    await recruiter.save()
+
     res.json({
         success: true,
         message: 'Login successful',
         data: {
-            company: { _id: company._id, name: company.name, email: company.email, image: company.image },
-            token: generateToken(company._id),
+            company: {
+                _id: company._id,
+                name: company.name,
+                email: company.email,
+                image: company.image,
+                currentRecruiter: {
+                    _id: recruiter._id,
+                    name: recruiter.name,
+                    email: recruiter.email,
+                    role: recruiter.role,
+                },
+            },
+            token: generateToken({ companyId: company._id, recruiterId: recruiter._id, role: recruiter.role }),
         }
     })
 })
@@ -99,7 +191,17 @@ export const getCompanyData = asyncHandler(async (req, res) => {
     res.json({ 
         success: true, 
         message: 'Company data fetched successfully',
-        data: { company: req.company } 
+        data: {
+            company: {
+                ...req.company,
+                currentRecruiter: {
+                    _id: req.recruiter?._id,
+                    name: req.recruiter?.name,
+                    email: req.recruiter?.email,
+                    role: req.recruiter?.role || 'Admin',
+                },
+            },
+        }
     })
 })
 
@@ -107,30 +209,54 @@ export const getCompanyData = asyncHandler(async (req, res) => {
 // @route   POST /api/company/post-job
 // @access  Private (Company)
 export const postJob = asyncHandler(async (req, res) => {
-    const { title, description, location, salary, level, category } = req.body
     const companyId = req.company._id
 
-    const trimmedDescription = sanitizeJobDescription(description.trim())
-    if (!trimmedDescription || trimmedDescription === '<p><br></p>') {
-        res.status(400)
-        throw new Error('Please enter a job description')
-    }
-
     const job = await Job.create({
-        title: title.trim(),
-        description: trimmedDescription,
-        location: location.trim(),
-        salary: Number(salary),
+        ...buildJobPayload(req.body),
         companyId,
         date: Date.now(),
-        level,
-        category,
     })
 
     res.status(201).json({ 
         success: true, 
         message: 'Job posted successfully', 
         data: { job } 
+    })
+})
+
+// @desc    Update a job owned by this company
+// @route   PUT /api/company/jobs/:id
+// @access  Private (Company)
+export const updateJob = asyncHandler(async (req, res) => {
+    const { id } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        res.status(400)
+        throw new Error('Invalid Job ID format')
+    }
+
+    const job = await Job.findOneAndUpdate(
+        { _id: id, companyId: req.company._id },
+        buildJobPayload(req.body),
+        { new: true, runValidators: true },
+    ).lean()
+
+    if (!job) {
+        res.status(404)
+        throw new Error('Job not found')
+    }
+
+    await logAuditEvent(req, {
+        action: 'JOB_EDITED',
+        targetType: 'Job',
+        targetId: job._id,
+        metadata: { title: job.title, location: job.location, salary: job.salary },
+    })
+
+    res.json({
+        success: true,
+        message: 'Job updated successfully',
+        data: { job },
     })
 })
 
@@ -143,11 +269,52 @@ export const getCompanyJobApplicants = asyncHandler(async (req, res) => {
     const limit = Math.min(100, parseInt(req.query.limit) || 20)
     const skip = (page - 1) * limit
 
-    const totalResults = await JobApplication.countDocuments({ companyId })
-    const applications = await JobApplication.find({ companyId })
+    const filter = { companyId }
+    if (req.query.pipelineStage) filter.pipelineStage = req.query.pipelineStage
+    if (req.query.jobId && mongoose.Types.ObjectId.isValid(req.query.jobId)) {
+        filter.jobId = req.query.jobId
+    }
+
+    const minScore = Number(req.query.minScore)
+    const maxScore = Number(req.query.maxScore)
+    if (!Number.isNaN(minScore) || !Number.isNaN(maxScore)) {
+        filter.matchScore = {}
+        if (!Number.isNaN(minScore)) filter.matchScore.$gte = Math.max(0, minScore)
+        if (!Number.isNaN(maxScore)) filter.matchScore.$lte = Math.min(100, maxScore)
+    }
+
+    const search = String(req.query.search || '').trim()
+    if (search) {
+        const [users, jobs] = await Promise.all([
+            User.find({ $text: { $search: search } }).select('_id').lean(),
+            Job.find({
+                companyId,
+                $text: { $search: search },
+            }).select('_id').lean(),
+        ])
+
+        const userIds = users.map((u) => u._id)
+        const jobIds = jobs.map((j) => j._id)
+        filter.$or = [
+            { userId: { $in: userIds } },
+            { jobId: { $in: jobIds } },
+        ]
+    }
+
+    const sortOptions = {
+        oldest: { date: 1 },
+        score_desc: { matchScore: -1, date: -1 },
+        score_asc: { matchScore: 1, date: -1 },
+        updated: { updatedAt: -1 },
+        newest: { date: -1 },
+    }
+    const sort = sortOptions[req.query.sort] || sortOptions.newest
+
+    const totalResults = await JobApplication.countDocuments(filter)
+    const applications = await JobApplication.find(filter)
         .populate('userId', 'name image resume')
         .populate('jobId', 'title location category level salary')
-        .sort({ date: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean()
@@ -222,6 +389,13 @@ export const changeJobApplicationStatus = asyncHandler(async (req, res) => {
     application.pipelineStage = pipelineStage
     await application.save()
 
+    await logAuditEvent(req, {
+        action: 'PIPELINE_STAGE_CHANGED',
+        targetType: 'Application',
+        targetId: application._id,
+        metadata: { pipelineStage },
+    })
+
     emitToApplication(String(application._id), 'pipeline:updated', {
         applicationId: String(application._id),
         pipelineStage: application.pipelineStage,
@@ -266,6 +440,13 @@ export const addInternalNote = asyncHandler(async (req, res) => {
         rating: rating ? Number(rating) : undefined,
     })
     await application.save()
+
+    await logAuditEvent(req, {
+        action: 'INTERNAL_NOTE_ADDED',
+        targetType: 'Application',
+        targetId: application._id,
+        metadata: { rating: rating ? Number(rating) : null },
+    })
 
     emitToApplication(String(application._id), 'feedback:updated', {
         applicationId: String(application._id),
@@ -324,7 +505,8 @@ export const matchResume = asyncHandler(async (req, res) => {
 
     const resumeVersion = application.userId?.resumeAsset?.publicId || application.userId?.resume || 'no-resume'
     const jobVersion = application.jobId?.updatedAt?.getTime?.() || 'no-job-version'
-    const cacheKey = `match:${applicationId}:${resumeVersion}:${jobVersion}`
+    const aiModelKey = aiService.getCacheModelKey()
+    const cacheKey = `match:${aiModelKey}:${applicationId}:${resumeVersion}:${jobVersion}`
     let cached = await cacheGet(cacheKey).catch(() => null)
 
     if (cached) {
@@ -342,12 +524,165 @@ export const matchResume = asyncHandler(async (req, res) => {
     application.matchScore = result.score
     await application.save()
 
-    await cacheSet(cacheKey, { score: result.score, reason: result.reason }).catch(() => null)
+    await logAuditEvent(req, {
+        action: 'AI_SCORE_GENERATED',
+        targetType: 'Application',
+        targetId: application._id,
+        metadata: {
+            score: result.score,
+            recommendation: result.recommendation,
+            source: result.source,
+            model: result.model,
+            cached: false,
+        },
+    })
+
+    if (result.cacheable) {
+        await cacheSet(cacheKey, result).catch(() => null)
+    }
 
     res.json({
         success: true,
         message: 'AI analysis completed',
-        data: { score: result.score, reason: result.reason }
+        data: result
+    })
+})
+
+// @desc    List recruiter team members for a company
+// @route   GET /api/company/team
+// @access  Private (Admin)
+export const getRecruiterTeam = asyncHandler(async (req, res) => {
+    const members = await RecruiterUser.find({ companyId: req.company._id })
+        .select('-password')
+        .sort({ role: 1, name: 1 })
+        .lean()
+
+    res.json({
+        success: true,
+        message: 'Team members fetched successfully',
+        data: { members },
+    })
+})
+
+// @desc    Create a recruiter team member
+// @route   POST /api/company/team
+// @access  Private (Admin)
+export const createRecruiterTeamMember = asyncHandler(async (req, res) => {
+    const { name, email, password, role } = req.body
+    const normalizedEmail = email.toLowerCase().trim()
+
+    const exists = await Promise.all([
+        RecruiterUser.findOne({ email: normalizedEmail }),
+        Company.findOne({ email: normalizedEmail }),
+    ])
+    if (exists.some(Boolean)) {
+        res.status(409)
+        throw new Error('A recruiter with this email already exists')
+    }
+
+    const member = await RecruiterUser.create({
+        companyId: req.company._id,
+        name: name.trim(),
+        email: normalizedEmail,
+        password: await bcrypt.hash(password, 10),
+        role,
+    })
+
+    await logAuditEvent(req, {
+        action: 'TEAM_MEMBER_CREATED',
+        targetType: 'RecruiterUser',
+        targetId: member._id,
+        metadata: { email: member.email, role: member.role },
+    })
+
+    const safeMember = member.toObject()
+    delete safeMember.password
+
+    res.status(201).json({
+        success: true,
+        message: 'Team member created successfully',
+        data: { member: safeMember },
+    })
+})
+
+// @desc    Update recruiter team member role/status
+// @route   PATCH /api/company/team/:memberId
+// @access  Private (Admin)
+export const updateRecruiterTeamMember = asyncHandler(async (req, res) => {
+    const { memberId } = req.params
+    const { role, status, name } = req.body
+
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+        res.status(400)
+        throw new Error('Invalid team member ID format')
+    }
+
+    const update = {}
+    if (role) update.role = role
+    if (status) update.status = status
+    if (name) update.name = name.trim()
+
+    if (String(memberId) === String(req.recruiter?._id) && status === 'Suspended') {
+        res.status(400)
+        throw new Error('You cannot suspend your own account')
+    }
+
+    const member = await RecruiterUser.findOneAndUpdate(
+        { _id: memberId, companyId: req.company._id },
+        update,
+        { new: true, runValidators: true },
+    ).select('-password').lean()
+
+    if (!member) {
+        res.status(404)
+        throw new Error('Team member not found')
+    }
+
+    await logAuditEvent(req, {
+        action: 'TEAM_MEMBER_UPDATED',
+        targetType: 'RecruiterUser',
+        targetId: member._id,
+        metadata: update,
+    })
+
+    res.json({
+        success: true,
+        message: 'Team member updated successfully',
+        data: { member },
+    })
+})
+
+// @desc    List audit logs for a company
+// @route   GET /api/company/audit-logs
+// @access  Private (Admin)
+export const getAuditLogs = asyncHandler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1)
+    const limit = Math.min(100, parseInt(req.query.limit) || 30)
+    const skip = (page - 1) * limit
+    const filter = { companyId: req.company._id }
+    if (req.query.action) filter.action = req.query.action
+
+    const [totalResults, logs] = await Promise.all([
+        AuditLog.countDocuments(filter),
+        AuditLog.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+    ])
+
+    res.json({
+        success: true,
+        message: 'Audit logs fetched successfully',
+        data: {
+            logs,
+            pagination: {
+                totalResults,
+                totalPages: Math.ceil(totalResults / limit),
+                currentPage: page,
+                limit,
+            },
+        },
     })
 })
 
@@ -373,7 +708,8 @@ export const getResumeSummary = asyncHandler(async (req, res) => {
 
     const resumeVersion = application.userId?.resumeAsset?.publicId || application.userId?.resume || 'no-resume'
     const userVersion = application.userId?.updatedAt?.getTime?.() || 'no-user-version'
-    const cacheKey = `summary:${applicationId}:${resumeVersion}:${userVersion}`
+    const aiModelKey = aiService.getCacheModelKey()
+    const cacheKey = `summary:${aiModelKey}:${applicationId}:${resumeVersion}:${userVersion}`
     let cached = await cacheGet(cacheKey).catch(() => null)
 
     if (cached) {
@@ -388,7 +724,9 @@ export const getResumeSummary = asyncHandler(async (req, res) => {
     const resumeText = await aiService.parsePDF(buffer)
     const result = await aiService.generateResumeSummary(resumeText)
 
-    await cacheSet(cacheKey, result).catch(() => null)
+    if (result.cacheable) {
+        await cacheSet(cacheKey, result).catch(() => null)
+    }
 
     res.json({ 
         success: true, 
@@ -402,10 +740,11 @@ export const getResumeSummary = asyncHandler(async (req, res) => {
 // @access  Private (Company)
 export const getRecruiterAnalytics = asyncHandler(async (req, res) => {
     const companyId = req.company._id
+    const companyObjectId = new mongoose.Types.ObjectId(companyId)
 
     // 1. Applications Per Job
     const appsPerJob = await Job.aggregate([
-        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+        { $match: { companyId: companyObjectId } },
         {
             $lookup: {
                 from: 'jobapplications',
@@ -425,7 +764,7 @@ export const getRecruiterAnalytics = asyncHandler(async (req, res) => {
 
     // 2. Hiring Pipeline Distribution
     const pipelineDist = await JobApplication.aggregate([
-        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+        { $match: { companyId: companyObjectId } },
         {
             $group: {
                 _id: '$pipelineStage',
@@ -447,6 +786,73 @@ export const getRecruiterAnalytics = asyncHandler(async (req, res) => {
     const totalApplicants = await JobApplication.countDocuments({ companyId })
     const interviews = stagesMap['Interview'] + stagesMap['Offer'] + stagesMap['Hired']
     const hires = stagesMap['Hired']
+    const activeApplicants = totalApplicants - (stagesMap['Withdrawn'] || 0)
+
+    const [scoreStats] = await JobApplication.aggregate([
+        { $match: { companyId: companyObjectId, matchScore: { $gt: 0 } } },
+        {
+            $group: {
+                _id: null,
+                averageMatchScore: { $avg: '$matchScore' },
+                scoredApplicants: { $sum: 1 },
+            },
+        },
+    ])
+
+    const since = new Date()
+    since.setDate(since.getDate() - 13)
+    since.setHours(0, 0, 0, 0)
+    const applicationsOverTimeRaw = await JobApplication.aggregate([
+        { $match: { companyId: companyObjectId, date: { $gte: since.getTime() } } },
+        {
+            $group: {
+                _id: { $dateToString: { format: '%Y-%m-%d', date: { $toDate: '$date' } } },
+                count: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 } },
+    ])
+    const trendMap = applicationsOverTimeRaw.reduce((acc, item) => {
+        acc[item._id] = item.count
+        return acc
+    }, {})
+    const applicationsOverTime = Array.from({ length: 14 }, (_, index) => {
+        const day = new Date(since)
+        day.setDate(since.getDate() + index)
+        const date = day.toISOString().slice(0, 10)
+        return { date, count: trendMap[date] || 0 }
+    })
+
+    const applicationsForTiming = await JobApplication.find({ companyId })
+        .select('pipelineHistory')
+        .lean()
+    const stageDurations = PIPELINE_STAGES.reduce((acc, stage) => {
+        acc[stage] = []
+        return acc
+    }, {})
+    applicationsForTiming.forEach((application) => {
+        const history = application.pipelineHistory || []
+        const applied = history.find((event) => event.stage === 'Applied')?.at
+        if (!applied) return
+        const appliedAt = new Date(applied).getTime()
+        history.forEach((event) => {
+            if (event.stage === 'Applied' || !stageDurations[event.stage]) return
+            const days = (new Date(event.at).getTime() - appliedAt) / (1000 * 60 * 60 * 24)
+            if (days >= 0) stageDurations[event.stage].push(days)
+        })
+    })
+    const timeToStage = Object.entries(stageDurations)
+        .filter(([, durations]) => durations.length > 0)
+        .map(([stage, durations]) => ({
+            stage,
+            averageDays: Number((durations.reduce((sum, n) => sum + n, 0) / durations.length).toFixed(1)),
+        }))
+
+    const conversionRates = PIPELINE_STAGES.map((stage) => ({
+        stage,
+        count: stagesMap[stage] || 0,
+        rate: totalApplicants > 0 ? Math.round(((stagesMap[stage] || 0) / totalApplicants) * 100) : 0,
+    }))
 
     res.json({
         success: true,
@@ -454,10 +860,19 @@ export const getRecruiterAnalytics = asyncHandler(async (req, res) => {
         data: {
             appsPerJob,
             pipelineDistribution: Object.entries(stagesMap).map(([stage, count]) => ({ stage, count })),
+            applicationsOverTime,
+            conversionRates,
+            timeToStage,
             summary: {
                 totalApplicants,
+                activeApplicants,
                 interviews,
                 hires,
+                averageMatchScore: scoreStats ? Math.round(scoreStats.averageMatchScore) : 0,
+                scoredApplicants: scoreStats?.scoredApplicants || 0,
+                shortlistRate: totalApplicants > 0
+                    ? Math.round(((stagesMap['Screening'] + stagesMap['Interview'] + stagesMap['Offer'] + stagesMap['Hired']) / totalApplicants) * 100)
+                    : 0,
                 rejectionRate: totalApplicants > 0 
                     ? Math.round((stagesMap['Rejected'] / totalApplicants) * 100) 
                     : 0

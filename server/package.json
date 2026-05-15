@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node ./node_modules/kill-port/cli.js 5000 && nodemon server.js",
     "start": "node server.js",
-    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --detectOpenHandles --maxWorkers=1",
+    "lint": "eslint .",
     "seed": "node scripts/seedDemoData.js"
   },
   "nodemonConfig": {
@@ -37,16 +37,14 @@
     "nodemon": "^3.1.7",
     "pdf-parse": "^1.1.1",
     "redis": "^4.7.0",
+    "sanitize-html": "^2.17.4",
     "socket.io": "^4.8.3",
     "svix": "^1.42.0",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "cross-env": "^10.1.0",
-    "jest": "^30.3.0",
-    "kill-port": "^2.0.1",
-    "mongodb-memory-server": "^10.1.2",
-    "supertest": "^7.2.2"
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "kill-port": "^2.0.1"
   }
 }

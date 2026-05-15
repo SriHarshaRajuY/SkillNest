@@ -24,16 +24,20 @@ export const getJobs = asyncHandler(async (req, res) => {
     } else if (req.query.location) {
         filter.location = { $regex: req.query.location, $options: 'i' }
     }
-    if (req.query.search) {
-        filter.title = { $regex: req.query.search, $options: 'i' }
+    const search = String(req.query.search || '').trim()
+    if (search) {
+        filter.$text = { $search: search }
     }
 
     const sortOption = req.query.sort === 'oldest' ? { date: 1 } : { date: -1 }
 
     const totalResults = await Job.countDocuments(filter)
-    const jobs = await Job.find(filter)
+    const jobs = await Job.find(
+        filter,
+        filter.$text ? { score: { $meta: 'textScore' } } : {},
+    )
         .select('title description location category level salary date companyId')
-        .sort(sortOption)
+        .sort(filter.$text ? { score: { $meta: 'textScore' }, date: -1 } : sortOption)
         .skip(skip)
         .limit(limit)
         .populate({ path: 'companyId', select: 'name image' })

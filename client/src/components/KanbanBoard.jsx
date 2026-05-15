@@ -20,7 +20,8 @@ const KanbanBoard = ({
     setSelectedId,
     viewApplicantResume,
     handleAIMatch,
-    matchResults
+    matchResults,
+    canReview = true
 }) => {
     return (
         <div className='flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-220px)]'>
@@ -28,8 +29,8 @@ const KanbanBoard = ({
                 <div
                     key={stage}
                     className={`flex-1 min-w-[280px] rounded-xl p-4 border-2 border-dashed bg-gray-50/80 flex flex-col ${COLUMN_RING[stage] || 'border-gray-200'}`}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, stage)}
+                    onDragOver={canReview ? handleDragOver : undefined}
+                    onDrop={canReview ? (e) => handleDrop(e, stage) : undefined}
                 >
                     <h2 className='font-semibold mb-4 pb-2 border-b border-gray-200 text-gray-800 flex justify-between items-center'>
                         <span>{PIPELINE_LABELS[stage]}</span>
@@ -50,6 +51,7 @@ const KanbanBoard = ({
                                     viewApplicantResume={viewApplicantResume}
                                     handleAIMatch={handleAIMatch}
                                     matchResults={matchResults}
+                                    canReview={canReview}
                                 />
                             ))}
                     </div>

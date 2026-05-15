@@ -14,7 +14,16 @@ const userSchema = new mongoose.Schema({
     resume: { type: String, default: '' },
     resumeAsset: { type: resumeAssetSchema, default: null },
     image: { type: String, default: '' },
+    skills: { type: [String], default: [] },
+    preferredLocations: { type: [String], default: [] },
+    preferredCategories: { type: [String], default: [] },
+    experienceLevel: { type: String, trim: true, default: '' },
 }, { timestamps: true })
+
+userSchema.index(
+    { name: 'text', email: 'text', skills: 'text', preferredLocations: 'text', preferredCategories: 'text' },
+    { weights: { name: 5, skills: 4, preferredCategories: 3, preferredLocations: 2, email: 1 }, name: 'candidate_search_text' },
+)
 
 const User = mongoose.models.User || mongoose.model('User', userSchema)
 

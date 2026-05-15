@@ -5,6 +5,7 @@ import {
     loginCompany,
     getCompanyData,
     postJob,
+    updateJob,
     getCompanyJobApplicants,
     getCompanyPostedJobs,
     changeJobApplicationStatus,
@@ -13,6 +14,10 @@ import {
     getResumeSummary,
     addInternalNote,
     getRecruiterAnalytics,
+    getRecruiterTeam,
+    createRecruiterTeamMember,
+    updateRecruiterTeamMember,
+    getAuditLogs,
 } from '../controllers/companyController.js'
 import {
     listCompanyThreads,
@@ -22,7 +27,7 @@ import {
 } from '../controllers/messageController.js'
 import { getApplicantResumeSignedUrl } from '../controllers/userController.js'
 import upload from '../config/multer.js'
-import { protectCompany } from '../middleware/authMiddleware.js'
+import { protectCompany, requireRecruiterRole } from '../middleware/authMiddleware.js'
 import validate from '../middleware/validationMiddleware.js'
 import schemas from '../utils/validators.js'
 
@@ -46,21 +51,28 @@ router.post('/login', loginLimiter, validate(schemas.recruiterLogin), loginCompa
 router.get('/company', protectCompany, getCompanyData)
 
 // Jobs and applicants
-router.post('/post-job', protectCompany, validate(schemas.postJob), postJob)
+router.post('/post-job', protectCompany, requireRecruiterRole('Admin'), validate(schemas.postJob), postJob)
+router.put('/jobs/:id', protectCompany, requireRecruiterRole('Admin'), validate(schemas.updateJob), updateJob)
 router.get('/applicants', protectCompany, getCompanyJobApplicants)
-router.get('/applicant-resume/:applicationId', protectCompany, getApplicantResumeSignedUrl)
+router.get('/applicant-resume/:applicationId', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), getApplicantResumeSignedUrl)
 router.get('/list-jobs', protectCompany, getCompanyPostedJobs)
-router.post('/change-status', protectCompany, validate(schemas.updatePipeline), changeJobApplicationStatus)
-router.post('/applications/:applicationId/internal-notes', protectCompany, validate(schemas.internalNote), addInternalNote)
-router.post('/change-visibility', protectCompany, validate(schemas.changeVisibility), changeVisibility)
-router.get('/match-resume/:applicationId', protectCompany, matchResume)
-router.get('/resume-summary/:applicationId', protectCompany, getResumeSummary)
+router.post('/change-status', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), validate(schemas.updatePipeline), changeJobApplicationStatus)
+router.post('/applications/:applicationId/internal-notes', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), validate(schemas.internalNote), addInternalNote)
+router.post('/change-visibility', protectCompany, requireRecruiterRole('Admin'), validate(schemas.changeVisibility), changeVisibility)
+router.get('/match-resume/:applicationId', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), matchResume)
+router.get('/resume-summary/:applicationId', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), getResumeSummary)
+
+// Team and audit
+router.get('/team', protectCompany, requireRecruiterRole('Admin'), getRecruiterTeam)
+router.post('/team', protectCompany, requireRecruiterRole('Admin'), validate(schemas.createTeamMember), createRecruiterTeamMember)
+router.patch('/team/:memberId', protectCompany, requireRecruiterRole('Admin'), validate(schemas.updateTeamMember), updateRecruiterTeamMember)
+router.get('/audit-logs', protectCompany, requireRecruiterRole('Admin'), getAuditLogs)
 
 // Messaging
 router.get('/messages/threads', protectCompany, listCompanyThreads)
 router.get('/messages/thread/:applicationId', protectCompany, getCompanyThread)
 router.post('/messages/thread/:applicationId/read', protectCompany, markCompanyThreadRead)
-router.post('/messages', protectCompany, validate(schemas.sendMessage), postCompanyMessage)
+router.post('/messages', protectCompany, requireRecruiterRole('Admin', 'Recruiter'), validate(schemas.sendMessage), postCompanyMessage)
 
 // Analytics
 router.get('/analytics', protectCompany, getRecruiterAnalytics)

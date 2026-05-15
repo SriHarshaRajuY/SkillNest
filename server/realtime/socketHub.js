@@ -42,9 +42,10 @@ export function initRealtime(httpServer) {
             if (decoded.role === 'candidate' && decoded.userId) {
                 socket.data.role = 'candidate'
                 socket.data.userId = decoded.userId
-            } else if (decoded.id) {
+            } else if (decoded.id || decoded.companyId) {
                 socket.data.role = 'company'
-                socket.data.companyId = String(decoded.id)
+                socket.data.companyId = String(decoded.companyId || decoded.id)
+                socket.data.recruiterRole = decoded.role || 'Admin'
             } else {
                 return next(new Error('Authentication failed: Invalid token payload'))
             }

@@ -23,6 +23,8 @@ const Dashboard = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const { companyData, companyLoaded, setCompanyData, setCompanyToken } = useContext(AppContext)
+    const recruiterRole = companyData?.currentRecruiter?.role || 'Admin'
+    const isAdmin = recruiterRole === 'Admin'
 
     const logout = () => {
         setCompanyToken(null)
@@ -31,12 +33,12 @@ const Dashboard = () => {
         navigate('/')
     }
 
-    // Redirect to manage-jobs only when landing directly on /dashboard (no sub-route)
+    // Send each recruiter role to its most useful first screen.
     useEffect(() => {
         if (companyLoaded && companyData && location.pathname === '/dashboard') {
-            navigate('/dashboard/manage-jobs', { replace: true })
+            navigate(isAdmin ? '/dashboard/manage-jobs' : '/dashboard/view-applications', { replace: true })
         }
-    }, [companyLoaded, companyData, location.pathname])
+    }, [companyLoaded, companyData, isAdmin, location.pathname, navigate])
 
     if (!companyLoaded) {
         return <Loading />
@@ -82,15 +84,17 @@ const Dashboard = () => {
                 {/* Sidebar */}
                 <aside className='min-h-full border-r border-gray-200 bg-white sticky top-[73px] self-start w-16 sm:w-64 shadow-[2px_0_8px_rgba(0,0,0,0.02)] z-30 transition-all duration-300'>
                     <ul className='flex flex-col items-start pt-6 text-gray-600 gap-1 px-2 sm:px-4'>
-                        <NavLink
-                            className={({ isActive }) =>
-                                `flex items-center p-3 sm:px-4 gap-3 w-full rounded-xl transition-all duration-200 group ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'hover:bg-gray-50 hover:text-gray-900'}`
-                            }
-                            to='/dashboard/add-job'
-                        >
-                            <img className={`min-w-5 w-5 transition-transform group-hover:scale-110`} src={assets.add_icon} alt='' />
-                            <p className='max-sm:hidden text-sm font-semibold'>Add Job</p>
-                        </NavLink>
+                        {isAdmin && (
+                            <NavLink
+                                className={({ isActive }) =>
+                                    `flex items-center p-3 sm:px-4 gap-3 w-full rounded-xl transition-all duration-200 group ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'hover:bg-gray-50 hover:text-gray-900'}`
+                                }
+                                to='/dashboard/add-job'
+                            >
+                                <img className={`min-w-5 w-5 transition-transform group-hover:scale-110`} src={assets.add_icon} alt='' />
+                                <p className='max-sm:hidden text-sm font-semibold'>Add Job</p>
+                            </NavLink>
+                        )}
 
                         <NavLink
                             className={({ isActive }) =>
@@ -131,6 +135,30 @@ const Dashboard = () => {
                             <SidebarInsightsIcon />
                             <p className='max-sm:hidden text-sm font-semibold'>Hiring Insights</p>
                         </NavLink>
+
+                        {isAdmin && (
+                            <>
+                                <NavLink
+                                    className={({ isActive }) =>
+                                        `flex items-center p-3 sm:px-4 gap-3 w-full rounded-xl transition-all duration-200 group ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'hover:bg-gray-50 hover:text-gray-900'}`
+                                    }
+                                    to='/dashboard/team'
+                                >
+                                    <SidebarMessageIcon />
+                                    <p className='max-sm:hidden text-sm font-semibold'>Team</p>
+                                </NavLink>
+
+                                <NavLink
+                                    className={({ isActive }) =>
+                                        `flex items-center p-3 sm:px-4 gap-3 w-full rounded-xl transition-all duration-200 group ${isActive ? 'bg-blue-50 text-blue-700 shadow-sm' : 'hover:bg-gray-50 hover:text-gray-900'}`
+                                    }
+                                    to='/dashboard/audit-logs'
+                                >
+                                    <SidebarInsightsIcon />
+                                    <p className='max-sm:hidden text-sm font-semibold'>Audit Logs</p>
+                                </NavLink>
+                            </>
+                        )}
                     </ul>
                 </aside>
 

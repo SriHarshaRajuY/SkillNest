@@ -5,9 +5,20 @@ import JobCard from './JobCard'
 import Pagination from './Pagination'
 import { JobCardSkeleton } from './Skeleton'
 import { jobService } from '../services/jobService'
+import { applicationService } from '../services/applicationService'
+import { useAuth, useUser } from '@clerk/clerk-react'
 
 const JobListing = () => {
-    const { isSearched, searchFilter, setSearchFilter, backendUrl } = useContext(AppContext)
+    const {
+        isSearched,
+        searchFilter,
+        setSearchFilter,
+        backendUrl,
+        savedJobIds,
+        setSavedJobIds,
+    } = useContext(AppContext)
+    const { user } = useUser()
+    const { getToken } = useAuth()
 
     const [showFilter, setShowFilter] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
@@ -15,6 +26,7 @@ const JobListing = () => {
     const [selectedLocations, setSelectedLocations] = useState([])
     
     const [jobs, setJobs] = useState([])
+    const [recommendedJobs, setRecommendedJobs] = useState([])
     const [totalPages, setTotalPages] = useState(1)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -49,9 +61,27 @@ const JobListing = () => {
         }
     }, [currentPage, searchFilter, selectedCategories, selectedLocations, backendUrl])
 
+    const fetchRecommendedJobs = useCallback(async () => {
+        if (!user) {
+            setRecommendedJobs([])
+            return
+        }
+        try {
+            const token = await getToken()
+            const response = await applicationService.getRecommendedJobs(token, { limit: 3 })
+            if (response.success) setRecommendedJobs(response.data.jobs || [])
+        } catch {
+            setRecommendedJobs([])
+        }
+    }, [user, getToken])
+
     useEffect(() => {
         fetchJobs()
     }, [fetchJobs])
+
+    useEffect(() => {
+        fetchRecommendedJobs()
+    }, [fetchRecommendedJobs])
 
     // Reset to page 1 when filters change
     useEffect(() => {
@@ -71,6 +101,14 @@ const JobListing = () => {
     }
 
     const jobsCount = jobs?.length || 0
+    const handleSavedChange = (jobId, saved) => {
+        setSavedJobIds((prev) => {
+            const set = new Set(prev.map(String))
+            if (saved) set.add(String(jobId))
+            else set.delete(String(jobId))
+            return [...set]
+        })
+    }
 
     return (
         <div className='container 2xl:px-20 mx-auto flex flex-col lg:flex-row max-lg:space-y-8 py-8 animate-fade-in'>
@@ -174,11 +212,42 @@ const JobListing = () => {
                     </div>
                 )}
 
+                {recommendedJobs.length > 0 && (
+                    <div className='mb-10 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5'>
+                        <div className='flex items-center justify-between gap-4 mb-4'>
+                            <div>
+                                <h4 className='font-black text-slate-900 text-xl'>Recommended for you</h4>
+                                <p className='text-sm text-emerald-700 font-medium'>Based on saved jobs and past applications</p>
+                            </div>
+                            <span className='hidden sm:inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-100'>
+                                Lightweight matching
+                            </span>
+                        </div>
+                        <div className='grid grid-cols-1 xl:grid-cols-3 gap-4'>
+                            {recommendedJobs.map((job) => (
+                                <JobCard
+                                    key={job._id}
+                                    job={job}
+                                    isSaved={savedJobIds.map(String).includes(String(job._id))}
+                                    onSavedChange={handleSavedChange}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6'>
                     {loading ? (
                         Array.from({ length: 6 }).map((_, i) => <JobCardSkeleton key={i} />)
                     ) : jobsCount > 0 ? (
-                        jobs.map((job) => <JobCard key={job._id} job={job} />)
+                        jobs.map((job) => (
+                            <JobCard
+                                key={job._id}
+                                job={job}
+                                isSaved={savedJobIds.map(String).includes(String(job._id))}
+                                onSavedChange={handleSavedChange}
+                            />
+                        ))
                     ) : !error && (
                         <div className='col-span-full text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200'>
                             <div className='text-4xl mb-4'>No results</div>

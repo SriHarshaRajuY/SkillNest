@@ -6,8 +6,8 @@ export const notFound = (req, res, next) => {
     next(error)
 }
 
-export const errorHandler = (err, req, res, next) => {
-    let statusCode = res.statusCode === 200 ? 500 : res.statusCode
+export const errorHandler = (err, req, res, _next) => {
+    let statusCode = err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode)
     let message = err.message
 
     if (err.name === 'CastError' && err.kind === 'ObjectId') {

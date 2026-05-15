@@ -61,6 +61,8 @@ jobApplicationSchema.index({ userId: 1, jobId: 1 }, { unique: true })
 // Index for performant querying of pipeline stages and company loads
 jobApplicationSchema.index({ companyId: 1, pipelineStage: 1 })
 jobApplicationSchema.index({ jobId: 1, date: -1 })
+jobApplicationSchema.index({ companyId: 1, matchScore: -1, date: -1 })
+jobApplicationSchema.index({ companyId: 1, updatedAt: -1 })
 
 const JobApplication = mongoose.models.JobApplication || mongoose.model('JobApplication', jobApplicationSchema)
 

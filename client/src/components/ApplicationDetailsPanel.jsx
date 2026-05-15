@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 
 const ApplicationDetailsPanel = ({
     selectedApplicant,
+    selectedMatch,
     setSelectedId,
     noteBody,
     setNoteBody,
@@ -12,13 +13,19 @@ const ApplicationDetailsPanel = ({
     savingNote,
     submitInternalNote,
     viewMode,
-    viewApplicantResume
+    viewApplicantResume,
+    canReview = true
 }) => {
     const [summary, setSummary] = useState(null)
     const [loadingSummary, setLoadingSummary] = useState(false)
 
     useEffect(() => {
         if (!selectedApplicant?._id) {
+            setSummary(null)
+            return
+        }
+
+        if (!canReview) {
             setSummary(null)
             return
         }
@@ -38,7 +45,7 @@ const ApplicationDetailsPanel = ({
         }
 
         fetchSummary()
-    }, [selectedApplicant?._id])
+    }, [selectedApplicant?._id, canReview])
 
     if (!selectedApplicant) return null
 
@@ -49,7 +56,9 @@ const ApplicationDetailsPanel = ({
                 {loadingSummary && <div className='w-3 h-3 border border-indigo-500 border-t-transparent rounded-full animate-spin' />}
             </div>
             
-            {loadingSummary ? (
+            {!canReview ? (
+                <p className='text-xs text-indigo-400 italic'>Restricted for Viewer role.</p>
+            ) : loadingSummary ? (
                 <div className='space-y-2'>
                     <div className='h-3 bg-indigo-100 rounded w-full animate-pulse' />
                     <div className='h-3 bg-indigo-100 rounded w-5/6 animate-pulse' />
@@ -74,6 +83,60 @@ const ApplicationDetailsPanel = ({
         </div>
     )
 
+    const renderMatchExplanation = () => {
+        if (!selectedMatch || selectedMatch.loading || selectedMatch.error || typeof selectedMatch.score !== 'number') {
+            return null
+        }
+
+        return (
+            <div className='mb-6 bg-white border border-slate-200 rounded-xl p-4 shadow-sm'>
+                <div className='flex items-center justify-between gap-3 mb-3'>
+                    <div>
+                        <p className='text-xs font-bold uppercase tracking-widest text-slate-500'>AI Match Explanation</p>
+                        <p className='text-sm text-slate-500 mt-1'>{selectedMatch.recommendation || 'Review manually'}</p>
+                    </div>
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-black ${
+                        selectedMatch.score >= 80
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : selectedMatch.score >= 50
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-rose-50 text-rose-700'
+                    }`}>
+                        {selectedMatch.score}%
+                    </div>
+                </div>
+
+                <p className='text-sm text-slate-700 leading-relaxed'>{selectedMatch.reason}</p>
+                {selectedMatch.experienceAlignment && (
+                    <p className='mt-3 text-sm text-slate-500 leading-relaxed'>{selectedMatch.experienceAlignment}</p>
+                )}
+
+                <div className='grid sm:grid-cols-2 gap-3 mt-4'>
+                    <div>
+                        <p className='text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-2'>Matched signals</p>
+                        <div className='flex flex-wrap gap-1.5'>
+                            {(selectedMatch.matchedSkills || []).length
+                                ? selectedMatch.matchedSkills.map((skill, i) => (
+                                    <span key={i} className='px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold'>{skill}</span>
+                                ))
+                                : <span className='text-xs text-slate-400'>No clear matches returned.</span>}
+                        </div>
+                    </div>
+                    <div>
+                        <p className='text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-2'>Gaps to review</p>
+                        <div className='flex flex-wrap gap-1.5'>
+                            {(selectedMatch.missingSkills || []).length
+                                ? selectedMatch.missingSkills.map((skill, i) => (
+                                    <span key={i} className='px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-[11px] font-bold'>{skill}</span>
+                                ))
+                                : <span className='text-xs text-slate-400'>No major gaps returned.</span>}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     if (viewMode === 'table') {
         return (
             <div className='mt-6 border border-gray-200 rounded-2xl bg-white shadow-sm overflow-hidden animate-fade-in'>
@@ -86,6 +149,7 @@ const ApplicationDetailsPanel = ({
                 </div>
                 <div className='p-4 grid md:grid-cols-2 gap-8'>
                     <div>
+                        {renderMatchExplanation()}
                         {renderSummary()}
                         <p className='text-xs font-semibold text-gray-500 uppercase mb-2 tracking-tight'>Direct Message</p>
                         <Link
@@ -132,7 +196,7 @@ const ApplicationDetailsPanel = ({
                                 />
                                 <button
                                     type='button'
-                                    disabled={savingNote || !noteBody.trim()}
+                                    disabled={savingNote || !noteBody.trim() || !canReview}
                                     onClick={submitInternalNote}
                                     className='px-4 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all'
                                 >
@@ -173,14 +237,16 @@ const ApplicationDetailsPanel = ({
                     <button
                         type='button'
                         onClick={() => viewApplicantResume(selectedApplicant._id)}
-                        className='flex-1 bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-all'
+                        disabled={!canReview}
+                        className='flex-1 bg-white text-indigo-900 text-xs font-bold py-2 rounded-lg hover:bg-indigo-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                        Resume
+                        {canReview ? 'Resume' : 'Restricted'}
                     </button>
                 </div>
             </div>
             
             <div className='flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide'>
+                {renderMatchExplanation()}
                 {renderSummary()}
 
                 <div>
@@ -238,7 +304,7 @@ const ApplicationDetailsPanel = ({
                         />
                         <button
                             type='button'
-                            disabled={savingNote || !noteBody.trim()}
+                            disabled={savingNote || !noteBody.trim() || !canReview}
                             onClick={submitInternalNote}
                             className='mt-3 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200'
                         >

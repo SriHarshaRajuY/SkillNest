@@ -1,5 +1,5 @@
 import swaggerUi from 'swagger-ui-express'
-import { PIPELINE_STAGES } from '../constants/pipeline.js'
+import { PIPELINE_STAGES, RECRUITER_PIPELINE_STAGES } from '../constants/pipeline.js'
 
 const envelope = (dataSchema) => ({
   type: 'object',
@@ -62,6 +62,8 @@ const swaggerSpec = {
     { name: 'Recruiter' },
     { name: 'Messaging' },
     { name: 'AI' },
+    { name: 'Team' },
+    { name: 'Audit' },
   ],
   components: {
     securitySchemes: {
@@ -132,6 +134,32 @@ const swaggerSpec = {
           applicationId: { type: 'string' },
           body: { type: 'string' },
           fromUser: { type: 'boolean' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      RecruiterUser: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          companyId: { type: 'string' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          role: { type: 'string', enum: ['Admin', 'Recruiter', 'Viewer'] },
+          status: { type: 'string', enum: ['Active', 'Suspended'] },
+          lastLoginAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      AuditLog: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          actorName: { type: 'string' },
+          actorEmail: { type: 'string' },
+          actorRole: { type: 'string' },
+          action: { type: 'string' },
+          targetType: { type: 'string' },
+          targetId: { type: 'string' },
+          metadata: { type: 'object' },
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
@@ -232,6 +260,65 @@ const swaggerSpec = {
           { in: 'query', name: 'status', schema: { type: 'string', enum: ['Pending', 'Accepted', 'Rejected'] } },
         ],
         responses: { 200: success('Applications fetched successfully') },
+      },
+    },
+    '/api/users/preferences': {
+      patch: {
+        tags: ['Candidate'],
+        summary: 'Update candidate skills and job preferences',
+        security: [{ clerkBearer: [] }],
+        requestBody: jsonBody({
+          type: 'object',
+          properties: {
+            skills: { type: 'array', items: { type: 'string' } },
+            preferredLocations: { type: 'array', items: { type: 'string' } },
+            preferredCategories: { type: 'array', items: { type: 'string' } },
+            experienceLevel: { type: 'string' },
+          },
+        }),
+        responses: { 200: success('Career preferences updated successfully'), 400: failure('Validation failed') },
+      },
+    },
+    '/api/users/applications/{applicationId}/withdraw': {
+      post: {
+        tags: ['Candidate'],
+        summary: 'Withdraw a candidate-owned application',
+        security: [{ clerkBearer: [] }],
+        parameters: [idParam('applicationId', 'Application id')],
+        responses: { 200: success('Application withdrawn successfully'), 404: failure('Application not found'), 409: failure('Already withdrawn') },
+      },
+    },
+    '/api/users/saved-jobs': {
+      get: {
+        tags: ['Candidate'],
+        summary: 'List candidate saved jobs',
+        security: [{ clerkBearer: [] }],
+        responses: { 200: success('Saved jobs fetched successfully') },
+      },
+    },
+    '/api/users/saved-jobs/{jobId}': {
+      post: {
+        tags: ['Candidate'],
+        summary: 'Save a job',
+        security: [{ clerkBearer: [] }],
+        parameters: [idParam('jobId', 'Job id')],
+        responses: { 201: success('Job saved successfully'), 404: failure('Job not found') },
+      },
+      delete: {
+        tags: ['Candidate'],
+        summary: 'Remove a saved job',
+        security: [{ clerkBearer: [] }],
+        parameters: [idParam('jobId', 'Job id')],
+        responses: { 200: success('Job removed from saved list') },
+      },
+    },
+    '/api/users/recommended-jobs': {
+      get: {
+        tags: ['Candidate'],
+        summary: 'Get explainable job recommendations from skills, preferences, saved jobs, and applications',
+        security: [{ clerkBearer: [] }],
+        parameters: [{ in: 'query', name: 'limit', schema: { type: 'integer', minimum: 1, maximum: 12 } }],
+        responses: { 200: success('Recommended jobs fetched successfully') },
       },
     },
     '/api/users/update-resume': {
@@ -373,6 +460,27 @@ const swaggerSpec = {
         responses: { 201: success('Job posted successfully'), 400: failure('Validation failed') },
       },
     },
+    '/api/company/jobs/{id}': {
+      put: {
+        tags: ['Recruiter'],
+        summary: 'Edit a company-owned job (Admin only)',
+        security: [{ recruiterToken: [] }],
+        parameters: [idParam('id', 'Job id')],
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['title', 'description', 'location', 'salary', 'level', 'category'],
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            location: { type: 'string' },
+            salary: { type: 'number' },
+            level: { type: 'string' },
+            category: { type: 'string' },
+          },
+        }),
+        responses: { 200: success('Job updated successfully'), 403: failure('Admin role required'), 404: failure('Job not found') },
+      },
+    },
     '/api/company/applicants': {
       get: {
         tags: ['Recruiter'],
@@ -381,6 +489,11 @@ const swaggerSpec = {
         parameters: [
           { in: 'query', name: 'page', schema: { type: 'integer' } },
           { in: 'query', name: 'limit', schema: { type: 'integer' } },
+          { in: 'query', name: 'search', schema: { type: 'string' } },
+          { in: 'query', name: 'jobId', schema: { type: 'string' } },
+          { in: 'query', name: 'pipelineStage', schema: { type: 'string', enum: PIPELINE_STAGES } },
+          { in: 'query', name: 'minScore', schema: { type: 'number', minimum: 0, maximum: 100 } },
+          { in: 'query', name: 'sort', schema: { type: 'string', enum: ['newest', 'oldest', 'score_desc', 'score_asc', 'updated'] } },
         ],
         responses: { 200: success('Applicants fetched successfully') },
       },
@@ -410,7 +523,7 @@ const swaggerSpec = {
         requestBody: jsonBody({
           type: 'object',
           required: ['id', 'pipelineStage'],
-          properties: { id: { type: 'string' }, pipelineStage: { type: 'string', enum: PIPELINE_STAGES } },
+          properties: { id: { type: 'string' }, pipelineStage: { type: 'string', enum: RECRUITER_PIPELINE_STAGES } },
         }),
         responses: { 200: success('Pipeline stage updated successfully'), 400: failure('Validation failed'), 404: failure('Application not found') },
       },
@@ -450,10 +563,10 @@ const swaggerSpec = {
     '/api/company/resume-summary/{applicationId}': {
       get: {
         tags: ['AI'],
-        summary: 'Generate or fetch cached AI resume summary',
+        summary: 'Generate or fetch cached AI resume summary (Admin/Recruiter only)',
         security: [{ recruiterToken: [] }],
         parameters: [idParam('applicationId', 'Application id')],
-        responses: { 200: success('AI summary generated'), 400: failure('Resume missing'), 404: failure('Application not found') },
+        responses: { 200: success('AI summary generated'), 400: failure('Resume missing'), 403: failure('Admin or Recruiter role required'), 404: failure('Application not found') },
       },
     },
     '/api/company/messages/threads': {
@@ -501,6 +614,60 @@ const swaggerSpec = {
         summary: 'Get basic recruiter dashboard metrics',
         security: [{ recruiterToken: [] }],
         responses: { 200: success('Analytics fetched successfully') },
+      },
+    },
+    '/api/company/team': {
+      get: {
+        tags: ['Team'],
+        summary: 'List recruiter team members (Admin only)',
+        security: [{ recruiterToken: [] }],
+        responses: { 200: success('Team members fetched successfully', { type: 'object', properties: { members: { type: 'array', items: { $ref: '#/components/schemas/RecruiterUser' } } } }) },
+      },
+      post: {
+        tags: ['Team'],
+        summary: 'Create recruiter team member (Admin only)',
+        security: [{ recruiterToken: [] }],
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['name', 'email', 'password', 'role'],
+          properties: {
+            name: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            password: { type: 'string', minLength: 8 },
+            role: { type: 'string', enum: ['Admin', 'Recruiter', 'Viewer'] },
+          },
+        }),
+        responses: { 201: success('Team member created successfully'), 403: failure('Admin role required'), 409: failure('Email already exists') },
+      },
+    },
+    '/api/company/team/{memberId}': {
+      patch: {
+        tags: ['Team'],
+        summary: 'Update recruiter role/status/name (Admin only)',
+        security: [{ recruiterToken: [] }],
+        parameters: [idParam('memberId', 'Recruiter user id')],
+        requestBody: jsonBody({
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Admin', 'Recruiter', 'Viewer'] },
+            status: { type: 'string', enum: ['Active', 'Suspended'] },
+          },
+        }),
+        responses: { 200: success('Team member updated successfully'), 403: failure('Admin role required'), 404: failure('Team member not found') },
+      },
+    },
+    '/api/company/audit-logs': {
+      get: {
+        tags: ['Audit'],
+        summary: 'List company audit logs (Admin only)',
+        security: [{ recruiterToken: [] }],
+        parameters: [
+          { in: 'query', name: 'page', schema: { type: 'integer' } },
+          { in: 'query', name: 'limit', schema: { type: 'integer', maximum: 100 } },
+          { in: 'query', name: 'action', schema: { type: 'string' } },
+        ],
+        responses: { 200: success('Audit logs fetched successfully', { type: 'object', properties: { logs: { type: 'array', items: { $ref: '#/components/schemas/AuditLog' } } } }) },
       },
     },
   },

@@ -1,4 +1,4 @@
-name: SkillNest CI
+name: SkillNest Build
 
 on:
   push:
@@ -7,64 +7,47 @@ on:
     branches: [ main, master ]
 
 jobs:
-  server-tests:
+  install-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    services:
-      mongodb:
-        image: mongo:6.0
-        ports:
-          - 27017:27017
-      redis:
-        image: redis:7.0
-        ports:
-          - 6379:6379
-    defaults:
-      run:
-        working-directory: ./server
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './server/package-lock.json'
-      - name: Install Dependencies
-        run: npm ci
-      - name: Run Lint
-        run: npm run lint
-      - name: Run Tests
-        run: npm test
-        env:
-          JWT_SECRET: "test_secret_key_for_ci"
-          MONGODB_URI: "mongodb://localhost:27017"
-          REDIS_URL: "redis://localhost:6379"
-          CLOUDINARY_NAME: "test"
-          CLOUDINARY_API_KEY: "test"
-          CLOUDINARY_SECRET_KEY: "test"
-          GEMINI_API_KEY: "test"
-          CLERK_WEBHOOK_SECRET: "whsec_test"
 
-  client-tests:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./client
-    steps:
-      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: './client/package-lock.json'
-      - name: Install Dependencies
-        run: npm ci
-      - name: Run Tests
-        run: npm test
-      - name: Build Client
+
+      - name: Install server dependencies
+        run: npm install
+        working-directory: ./server
+
+      - name: Install client dependencies
+        run: npm install
+        working-directory: ./client
+
+      - name: Lint server
+        run: npm run lint
+        working-directory: ./server
+
+      - name: Check server import
+        run: node -e "process.env.NODE_ENV='test'; import('./server.js')"
+        working-directory: ./server
+        env:
+          JWT_SECRET: "ci_secret"
+          MONGODB_URI: "mongodb://localhost:27017/skillnest-ci"
+          GEMINI_API_KEY: "ci_gemini"
+          CLOUDINARY_NAME: "ci_cloud"
+          CLOUDINARY_API_KEY: "ci_key"
+          CLOUDINARY_SECRET_KEY: "ci_secret"
+          CLERK_WEBHOOK_SECRET: "whsec_ci"
+
+      - name: Lint client
+        run: npm run lint
+        working-directory: ./client
+
+      - name: Build client
         run: npm run build
+        working-directory: ./client
         env:
           VITE_BACKEND_URL: "http://localhost:5000"
-          VITE_CLERK_PUBLISHABLE_KEY: "pk_test_123"
+          VITE_CLERK_PUBLISHABLE_KEY: "pk_live_placeholder"

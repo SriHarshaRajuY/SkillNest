@@ -23,12 +23,6 @@ const Hero = () => {
     return (
         <div className='container 2xl:px-20 mx-auto my-10 animate-fade-in'>
             <div className='relative bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white py-20 text-center mx-2 rounded-2xl overflow-hidden shadow-2xl'>
-                {/* Decorative background elements */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-                    <div className="absolute -top-24 -left-24 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-pulse-subtle"></div>
-                    <div className="absolute top-1/2 -right-24 w-80 h-80 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-pulse-subtle" style={{ animationDelay: '2s' }}></div>
-                </div>
-
                 <div className='relative z-10'>
                     <h2 className='text-3xl md:text-5xl lg:text-6xl font-extrabold mb-6 tracking-tight text-white'>
                         Find roles and track every application

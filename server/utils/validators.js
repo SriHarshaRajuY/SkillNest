@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { PIPELINE_STAGES } from '../constants/pipeline.js'
+import { RECRUITER_PIPELINE_STAGES } from '../constants/pipeline.js'
 
 const objectId = Joi.string().hex().length(24)
 
@@ -27,12 +27,41 @@ const schemas = {
 
     updatePipeline: Joi.object({
         id: objectId.required(),
-        pipelineStage: Joi.string().valid(...PIPELINE_STAGES).required()
+        pipelineStage: Joi.string().valid(...RECRUITER_PIPELINE_STAGES).required()
     }),
+
+    updateJob: Joi.object({
+        title: Joi.string().trim().min(2).max(200).required(),
+        description: Joi.string().trim().min(10).required(),
+        location: Joi.string().trim().required(),
+        salary: Joi.number().positive().required(),
+        level: Joi.string().required(),
+        category: Joi.string().required()
+    }),
+
+    createTeamMember: Joi.object({
+        name: Joi.string().trim().min(2).max(100).required(),
+        email: Joi.string().email().lowercase().trim().required(),
+        password: Joi.string().min(8).max(100).required(),
+        role: Joi.string().valid('Admin', 'Recruiter', 'Viewer').required()
+    }),
+
+    updateTeamMember: Joi.object({
+        name: Joi.string().trim().min(2).max(100).optional(),
+        role: Joi.string().valid('Admin', 'Recruiter', 'Viewer').optional(),
+        status: Joi.string().valid('Active', 'Suspended').optional(),
+    }).min(1),
 
     // ─── Candidate ─────────────────────────────────────────────────────────────
     applyJob: Joi.object({
         jobId: objectId.required()
+    }),
+
+    candidatePreferences: Joi.object({
+        skills: Joi.array().items(Joi.string().trim().min(1).max(40)).max(20).default([]),
+        preferredLocations: Joi.array().items(Joi.string().trim().min(1).max(80)).max(10).default([]),
+        preferredCategories: Joi.array().items(Joi.string().trim().min(1).max(80)).max(10).default([]),
+        experienceLevel: Joi.string().trim().max(80).allow('').default('')
     }),
 
     // ─── Messaging ─────────────────────────────────────────────────────────────

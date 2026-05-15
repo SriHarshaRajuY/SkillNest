@@ -33,7 +33,7 @@ async function seed() {
     const jobs = await Job.insertMany([
         {
             title: 'SDE Intern - Backend',
-            description: '<p>Build APIs, MongoDB models, validation, and integration tests for hiring workflows.</p>',
+            description: '<p>Build APIs, MongoDB models, validation, and scalable hiring workflow features.</p>',
             location: 'Bengaluru',
             category: 'Engineering',
             level: 'Intern',

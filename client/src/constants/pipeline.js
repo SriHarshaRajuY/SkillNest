@@ -6,7 +6,10 @@ export const PIPELINE_STAGES = [
     'Offer',
     'Hired',
     'Rejected',
+    'Withdrawn',
 ]
+
+export const RECRUITER_PIPELINE_STAGES = PIPELINE_STAGES.filter((stage) => stage !== 'Withdrawn')
 
 export const PIPELINE_LABELS = {
     Applied: 'Applied',
@@ -15,6 +18,7 @@ export const PIPELINE_LABELS = {
     Offer: 'Offer',
     Hired: 'Hired',
     Rejected: 'Not moving forward',
+    Withdrawn: 'Withdrawn',
 }
 
 export function stageIndex(stage) {

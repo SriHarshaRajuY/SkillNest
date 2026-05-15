@@ -3,6 +3,7 @@ import { PIPELINE_STAGES, PIPELINE_LABELS, stageIndex } from '../constants/pipel
 const LivePipeline = ({ pipelineStage = 'Applied', pipelineHistory = [], compact = false }) => {
     const currentIdx = stageIndex(pipelineStage)
     const isRejected = pipelineStage === 'Rejected'
+    const isWithdrawn = pipelineStage === 'Withdrawn'
 
     const historyTimes = {}
     ;(pipelineHistory || []).forEach((h) => {
@@ -17,7 +18,9 @@ const LivePipeline = ({ pipelineStage = 'Applied', pipelineHistory = [], compact
                 </span>
                 <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        isRejected
+                        isWithdrawn
+                            ? 'bg-slate-100 text-slate-700 ring-1 ring-slate-200'
+                            : isRejected
                             ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-100'
                             : pipelineStage === 'Hired'
                               ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
@@ -32,7 +35,7 @@ const LivePipeline = ({ pipelineStage = 'Applied', pipelineHistory = [], compact
                 <div className='absolute left-0 right-0 top-[11px] h-0.5 bg-slate-200 rounded' aria-hidden />
                 <div
                     className={`absolute left-0 top-[11px] h-0.5 rounded transition-all duration-500 ${
-                        isRejected ? 'bg-rose-400' : 'bg-gradient-to-r from-sky-400 to-indigo-500'
+                        isWithdrawn ? 'bg-slate-400' : isRejected ? 'bg-rose-400' : 'bg-gradient-to-r from-sky-400 to-indigo-500'
                     }`}
                     style={{
                         width: `${PIPELINE_STAGES.length > 1 ? (currentIdx / (PIPELINE_STAGES.length - 1)) * 100 : 0}%`,

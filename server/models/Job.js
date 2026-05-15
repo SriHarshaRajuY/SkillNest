@@ -21,6 +21,16 @@ jobSchema.index({ location: 1 })
 jobSchema.index({ visible: 1 })
 jobSchema.index({ date: -1 })
 jobSchema.index({ salary: 1 })
+jobSchema.index({
+    title: 'text',
+    description: 'text',
+    location: 'text',
+    category: 'text',
+    level: 'text',
+}, {
+    weights: { title: 8, category: 4, location: 3, level: 2, description: 1 },
+    name: 'job_search_text',
+})
 
 const Job = mongoose.models.Job || mongoose.model('Job', jobSchema)
 

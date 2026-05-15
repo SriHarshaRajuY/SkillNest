@@ -1,12 +1,16 @@
 import { assets } from '../assets/assets'
 import { useNavigate } from 'react-router-dom'
-import { useClerk, useUser } from '@clerk/clerk-react'
+import { useAuth, useClerk, useUser } from '@clerk/clerk-react'
 import { toast } from 'react-toastify'
+import { applicationService } from '../services/applicationService'
+import { BookmarkIcon as BookmarkOutline } from '@heroicons/react/24/outline'
+import { BookmarkIcon as BookmarkSolid } from '@heroicons/react/24/solid'
 
-const JobCard = ({ job }) => {
+const JobCard = ({ job, isSaved = false, onSavedChange }) => {
 
   const navigate = useNavigate()
   const { openSignIn } = useClerk()
+  const { getToken } = useAuth()
   const { user } = useUser()
 
   const handleApplyClick = () => {
@@ -24,6 +28,30 @@ const JobCard = ({ job }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleSaveClick = async (e) => {
+    e.stopPropagation()
+    if (!user) {
+      toast.info('Please sign in to save jobs')
+      openSignIn()
+      return
+    }
+
+    try {
+      const token = await getToken()
+      if (isSaved) {
+        await applicationService.unsaveJob(job._id, token)
+        onSavedChange?.(job._id, false)
+        toast.success('Removed from saved jobs')
+      } else {
+        await applicationService.saveJob(job._id, token)
+        onSavedChange?.(job._id, true)
+        toast.success('Job saved')
+      }
+    } catch (error) {
+      toast.error(error.message || 'Could not update saved job')
+    }
+  }
+
   return (
     <div className='group bg-white border border-slate-200 p-6 shadow-sm rounded-2xl hover:shadow-xl hover:border-indigo-100 transition-all duration-300 animate-fade-in'>
       <div className='flex justify-between items-start'>
@@ -35,9 +63,24 @@ const JobCard = ({ job }) => {
             alt={job.companyId.name}
           />
         </div>
-        <span className='bg-slate-100 text-slate-600 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md'>
-          {job.category || 'General'}
-        </span>
+        <div className='flex items-center gap-2'>
+          <span className='bg-slate-100 text-slate-600 text-[10px] uppercase tracking-widest font-bold px-2 py-1 rounded-md'>
+            {job.category || 'General'}
+          </span>
+          <button
+            type='button'
+            onClick={handleSaveClick}
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center font-black transition-all ${
+              isSaved
+                ? 'bg-amber-50 text-amber-600 border-amber-200'
+                : 'bg-white text-slate-400 border-slate-200 hover:text-amber-600 hover:border-amber-200'
+            }`}
+            aria-label={isSaved ? 'Remove saved job' : 'Save job'}
+            title={isSaved ? 'Saved job' : 'Save job'}
+          >
+            {isSaved ? <BookmarkSolid className='w-4 h-4' /> : <BookmarkOutline className='w-4 h-4' />}
+          </button>
+        </div>
       </div>
       
       <div className='mt-5'>
@@ -53,6 +96,16 @@ const JobCard = ({ job }) => {
           {job.level}
         </span>
       </div>
+
+      {Array.isArray(job.recommendationReasons) && job.recommendationReasons.length > 0 && (
+        <div className='mt-4 flex flex-wrap gap-2'>
+          {job.recommendationReasons.map((reason) => (
+            <span key={reason} className='rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-100'>
+              {reason}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div 
         className='text-slate-500 text-sm mt-4 line-clamp-2 leading-relaxed' 

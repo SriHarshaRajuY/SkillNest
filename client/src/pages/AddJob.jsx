@@ -18,6 +18,8 @@ const AddJob = () => {
     const quillRef = useRef(null)
 
     const { companyToken } = useContext(AppContext)
+    const { companyData } = useContext(AppContext)
+    const isAdmin = (companyData?.currentRecruiter?.role || 'Admin') === 'Admin'
 
     const onSubmitHandler = async (e) => {
         e.preventDefault()
@@ -72,6 +74,15 @@ const AddJob = () => {
             })
         }
     }, [])
+
+    if (!isAdmin) {
+        return (
+            <div className='rounded-xl border border-amber-100 bg-amber-50 p-8 text-center'>
+                <h2 className='text-xl font-black text-amber-900'>Admin access required</h2>
+                <p className='text-amber-700 mt-2'>Only Admin recruiters can post new jobs.</p>
+            </div>
+        )
+    }
 
     return (
         <form onSubmit={onSubmitHandler} className='container p-4 flex flex-col w-full items-start gap-4 max-w-3xl animate-fade-in'>

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import SkillNestLogo from './SkillNestLogo'
 
 const Footer = () => {
@@ -14,8 +15,8 @@ const Footer = () => {
 
           <div className='flex flex-wrap justify-center gap-8 text-sm font-medium text-gray-600'>
             <a href='#job-list' className='hover:text-blue-600 transition-colors'>Jobs</a>
-            <a href='/applications' className='hover:text-blue-600 transition-colors'>Applications</a>
-            <a href='/messages' className='hover:text-blue-600 transition-colors'>Messages</a>
+            <Link to='/applications' className='hover:text-blue-600 transition-colors'>Applications</Link>
+            <Link to='/messages' className='hover:text-blue-600 transition-colors'>Messages</Link>
           </div>
 
           <p className='text-sm text-gray-400'>Built for secure hiring workflows.</p>

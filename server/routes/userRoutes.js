@@ -1,8 +1,14 @@
 import express from 'express'
 import {
     getUserData,
+    updateCandidatePreferences,
     applyForJob,
     getUserJobApplications,
+    withdrawApplication,
+    saveJob,
+    unsaveJob,
+    getSavedJobs,
+    getRecommendedJobs,
     updateUserResume,
     getResumeSignedUrl,
     getRealtimeToken,
@@ -36,6 +42,7 @@ const applyLimiter = rateLimit({
  *     summary: Get logged-in user profile
  */
 router.get('/user', protectUser, getUserData)
+router.patch('/preferences', protectUser, validate(schemas.candidatePreferences), updateCandidatePreferences)
 
 /**
  * @swagger
@@ -60,6 +67,13 @@ router.post('/apply', protectUser, applyLimiter, validate(schemas.applyJob), app
  *     summary: Get list of user applications
  */
 router.get('/applications', protectUser, getUserJobApplications)
+
+router.post('/applications/:applicationId/withdraw', protectUser, withdrawApplication)
+
+router.get('/saved-jobs', protectUser, getSavedJobs)
+router.post('/saved-jobs/:jobId', protectUser, saveJob)
+router.delete('/saved-jobs/:jobId', protectUser, unsaveJob)
+router.get('/recommended-jobs', protectUser, getRecommendedJobs)
 
 /**
  * @swagger
