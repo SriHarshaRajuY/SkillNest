@@ -117,18 +117,3 @@ npm test
 ```
 
 The backend test suite covers health, auth, validation, company auth, AI cache flow, and realtime initialization. The frontend suite currently covers the job card behavior and Clerk mocking setup.
-
-## Current Limitations
-
-- Realtime messaging is configured for a single Node.js instance. For horizontal scaling, add the Socket.io Redis adapter.
-- AI resume matching is assistive only. It should support recruiter review, not make automatic hiring decisions.
-- Redis is used as an optional cache. If Redis is unavailable, AI endpoints still work without caching.
-- Demo candidate users are seeded for recruiter review, not real Clerk login accounts.
-
-## Interview Positioning
-
-SkillNest is best described as:
-
-> An AI-assisted recruitment workflow platform with secure resume access, recruiter pipeline management, and realtime application-scoped messaging.
-
-The strongest discussion points are the auth boundary, signed resume access, AI failure handling, cache invalidation, database indexes, duplicate application protection, and Socket.io room authorization.
